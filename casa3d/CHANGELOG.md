@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5
+
+- Declara `init: false`, exigido pela base s6 v3 do Home Assistant.
+
 ## 0.1.4
 
 - Remove wrapper `with-contenv` do serviço para evitar falha de inicialização no Supervisor.
