@@ -1,7 +1,7 @@
 name: Casa 3D
 slug: casa3d
 description: Planta interativa da casa para Home Assistant
-version: "0.1.1"
+version: "0.1.2"
 panel_icon: mdi:home-map-marker
 panel_title: Casa 3D
 panel_admin: false
@@ -11,9 +11,6 @@ arch:
 startup: services
 boot: auto
 host_network: false
-
-ports:
-  8000/tcp: 8000
 
 ingress: true
 ingress_port: 8000

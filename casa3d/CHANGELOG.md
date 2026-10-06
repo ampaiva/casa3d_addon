@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- Remove mapeamento de porta externa; o acesso passa a ser somente via Ingress.
+
 ## 0.1.1
 
 - Corrige build local usando a imagem base do Home Assistant.
