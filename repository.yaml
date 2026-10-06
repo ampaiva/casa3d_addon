@@ -1,0 +1,6 @@
+name: Casa 3D Add-on Repository
+url: https://github.com/ampaiva/casa3d_addon
+maintainer: Alexandre Paiva <ampaiva@gmail.com>
+addons:
+  - casa3d
+

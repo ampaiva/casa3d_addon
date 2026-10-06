@@ -1,0 +1,39 @@
+name: Casa 3D
+slug: casa3d
+description: Planta interativa da casa para Home Assistant
+version: "0.1.0"
+panel_icon: mdi:home-map-marker
+panel_title: Casa 3D
+panel_admin: false
+arch:
+  - amd64
+
+startup: services
+boot: auto
+host_network: false
+
+ports:
+  8000/tcp: 8000
+
+ingress: true
+ingress_port: 8000
+
+map:
+  - config:rw
+
+image: ghcr.io/ampaiva/casa3d_addon/{arch}
+
+options:
+  data_dir: "/data"
+  ha_url: "http://homeassistant:8123"
+  ha_token: ""
+  floor_ground_image: "casa_3d_terreo-v18.webp"
+  floor_upper_image: "casa_3d_superior-original.webp"
+
+schema:
+  data_dir: str
+  ha_url: str
+  ha_token: password
+  floor_ground_image: str
+  floor_upper_image: str
+

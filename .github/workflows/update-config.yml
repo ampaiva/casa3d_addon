@@ -1,0 +1,50 @@
+name: Update Add-on Version
+
+on:
+  repository_dispatch:
+    types: [backend_release]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout add-on repo
+        uses: actions/checkout@v4
+
+      - name: Set version from payload
+        run: |
+          VERSION='${{ github.event.client_payload.version }}'
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Update config.yaml version
+        run: |
+          VERSION="${{ env.VERSION }}"
+          sed -i "s/version: \".*\"/version: \"$VERSION\"/" casa3d/config.yaml
+          cat casa3d/config.yaml
+
+      - name: Open and merge version bump PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "addon-bot"
+          git config user.email "addon-bot@users.noreply.github.com"
+
+          if git diff --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          BRANCH="bump-version-${{ env.VERSION }}"
+          git checkout -b "$BRANCH"
+          git commit -am "chore: bump add-on version to ${{ env.VERSION }}"
+          git push origin "$BRANCH"
+
+          gh pr create --base main --head "$BRANCH" \
+            --title "chore: bump add-on version to ${{ env.VERSION }}" \
+            --body "Automated by the casa3d release workflow."
+          gh pr merge "$BRANCH" --squash --delete-branch
