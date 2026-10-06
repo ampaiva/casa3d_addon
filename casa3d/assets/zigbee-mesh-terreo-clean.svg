@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 962 1635" preserveAspectRatio="none">
+  <g fill="none" stroke-linecap="round">
+    <path d="M231 801 L154 687" stroke="#38bdf8" stroke-width="5" opacity="0.82">
+      <title>Sonoff/ZHA para Geladeira Branca: rota direta observada</title>
+    </path>
+    <path d="M231 801 L798 441" stroke="#38bdf8" stroke-width="5" opacity="0.82">
+      <title>Sonoff/ZHA para Aquecedor: rota direta observada</title>
+    </path>
+    <path d="M154 687 L798 441" stroke="#7dd3fc" stroke-width="3" opacity="0.52">
+      <title>Geladeira Branca e Aquecedor: vizinhanca observada</title>
+    </path>
+    <path d="M231 801 L269 752" stroke="#fb7185" stroke-width="4" opacity="0.86" stroke-dasharray="12 9">
+      <title>Medidor Quadro Direito: sem vizinhanca recente</title>
+    </path>
+    <path d="M279 801 L481 114.45" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz do Quintal: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L757.96 180.667" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Irrigacao do Quintal: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L683.02 294.3" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz da Area de Lazer: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L466.57 392.4" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Pilar do Quintal: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L575.853 647.133" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz da Varanda: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L222.414 449.952" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para LED da Bancada: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L327.08 587.946" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz da Cozinha: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L326.407 666.753" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz da Despensa: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L266.57 673.784" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Bebedouro: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L326.214 627.349" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Geladeira: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L540.452 957.783" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz da Sala: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L291.486 768.287" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Switch do Rack: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L574.41 780.222" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz do Corredor: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L673.4 768.45" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz do Quarto: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L634.15 915.6" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Espelho do Banheiro: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L666.474 1071.91" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Quarto de Baby: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L618.758 1227.23" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para LED do Armario: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L388.84 959.418" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz da Garagem: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L240.5 801.15" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz do Deposito: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L441.077 959.091" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz do Jardim: rota estimada pelo gateway</title>
+    </path>
+    <path d="M279 801 L490.043 956.802" stroke="#fb923c" stroke-width="2.4" opacity="0.28" stroke-dasharray="8 11">
+      <title>X5/Tuya para Luz Externa da Entrada: rota estimada pelo gateway</title>
+    </path>
+  </g>
+</svg>

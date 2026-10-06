@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1394" preserveAspectRatio="none">
+  <g fill="none" stroke-linecap="round">
+    <path d="M471.04 1161.17 L468.48 431.025" stroke="#256b8f" stroke-width="2.1" opacity="0.46" stroke-dasharray="7 9">
+      <title>Luz do Escritorio canal 1 para Luz do Escritorio 1</title>
+    </path>
+    <path d="M474.4 1161.17 L456.72 512.156" stroke="#256b8f" stroke-width="2.1" opacity="0.46" stroke-dasharray="7 9">
+      <title>Luz do Escritorio canal 2 para Luz do Escritorio 2</title>
+    </path>
+    <path d="M511.92 1160.75 L420.72 471.311" stroke="#256b8f" stroke-width="2.1" opacity="0.46" stroke-dasharray="7 9">
+      <title>Teto do Escritorio canal 1 para Teto do Escritorio 1</title>
+    </path>
+    <path d="M515.28 1160.75 L469.12 472.148" stroke="#256b8f" stroke-width="2.1" opacity="0.46" stroke-dasharray="7 9">
+      <title>Teto do Escritorio canal 2 para Teto do Escritorio 2</title>
+    </path>
+    <path d="M601.28 1085.19 L633.92 474.239" stroke="#256b8f" stroke-width="2.1" opacity="0.46" stroke-dasharray="7 9">
+      <title>Banheiro de Andre canal 1 para Banheiro de Andre 1</title>
+    </path>
+    <path d="M604.64 1085.19 L662.48 472.705" stroke="#256b8f" stroke-width="2.1" opacity="0.46" stroke-dasharray="7 9">
+      <title>Banheiro de Andre canal 2 para Banheiro de Andre 2</title>
+    </path>
+  </g>
+</svg>

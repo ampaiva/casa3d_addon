@@ -1,0 +1,137 @@
+{
+  "switch.quintal_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_quintal",
+    "device_registry_id": "f040c76c4277dc380a00ba54cca63ac9",
+    "name": "Quintal"
+  },
+  "switch.pilar_do_quintal_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_pilar_do_quintal",
+    "device_registry_id": "cbfb53496d410fbc588078c98319ebb9",
+    "name": "Pilar do Quintal"
+  },
+  "switch.pilar_do_quintal_switch_2_2": {
+    "sensor": "sensor.tuya_lqi_pilar_do_quintal",
+    "device_registry_id": "cbfb53496d410fbc588078c98319ebb9",
+    "name": "Pilar do Quintal"
+  },
+  "switch.luz_da_varanda_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_luz_da_varanda",
+    "device_registry_id": "17cc19eaabc935bd0fc04f5e9bb6dfca",
+    "name": "Luz da Varanda"
+  },
+  "switch.luz_da_varanda_switch_2_2": {
+    "sensor": "sensor.tuya_lqi_luz_da_varanda",
+    "device_registry_id": "17cc19eaabc935bd0fc04f5e9bb6dfca",
+    "name": "Luz da Varanda"
+  },
+  "switch.luz_da_varanda_switch_3_2": {
+    "sensor": "sensor.tuya_lqi_luz_da_varanda",
+    "device_registry_id": "17cc19eaabc935bd0fc04f5e9bb6dfca",
+    "name": "Luz da Varanda"
+  },
+  "switch.luz_da_varanda_switch_4_2": {
+    "sensor": "sensor.tuya_lqi_luz_da_varanda",
+    "device_registry_id": "17cc19eaabc935bd0fc04f5e9bb6dfca",
+    "name": "Luz da Varanda"
+  },
+  "switch.geladeira_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_geladeira",
+    "device_registry_id": "4303e344cbd601c012b1aa2b01636157",
+    "name": "Geladeira"
+  },
+  "switch.geladeira_switch_2_2": {
+    "sensor": "sensor.tuya_lqi_geladeira",
+    "device_registry_id": "4303e344cbd601c012b1aa2b01636157",
+    "name": "Geladeira"
+  },
+  "switch.luzes_internas_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_luzes_internas",
+    "device_registry_id": "31d517909ecddf8e4b85ddfbe6bf2b16",
+    "name": "Luzes Internas"
+  },
+  "switch.switch_do_rack_switch_1": {
+    "sensor": "sensor.tuya_lqi_switch_do_rack",
+    "device_registry_id": "790d48310c3ff1afc4f3bd7225a637c9",
+    "name": "Switch do Rack"
+  },
+  "switch.luzes_internas_switch_2_2": {
+    "sensor": "sensor.tuya_lqi_luzes_internas",
+    "device_registry_id": "31d517909ecddf8e4b85ddfbe6bf2b16",
+    "name": "Luzes Internas"
+  },
+  "switch.luz_do_quarto_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_luz_do_quarto",
+    "device_registry_id": "1c7e328709d62c1301f53ec8c40b0600",
+    "name": "Luz do Quarto"
+  },
+  "switch.luz_do_quarto_switch_2_2": {
+    "sensor": "sensor.tuya_lqi_luz_do_quarto",
+    "device_registry_id": "1c7e328709d62c1301f53ec8c40b0600",
+    "name": "Luz do Quarto"
+  },
+  "switch.luz_do_quarto_switch_3_2": {
+    "sensor": "sensor.tuya_lqi_luz_do_quarto",
+    "device_registry_id": "1c7e328709d62c1301f53ec8c40b0600",
+    "name": "Luz do Quarto"
+  },
+  "switch.quarto_de_baby_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_quarto_de_baby",
+    "device_registry_id": "6da3b15a01029825872b325da02151b3",
+    "name": "Quarto de Baby"
+  },
+  "switch.quarto_de_baby_switch_2_2": {
+    "sensor": "sensor.tuya_lqi_quarto_de_baby",
+    "device_registry_id": "6da3b15a01029825872b325da02151b3",
+    "name": "Quarto de Baby"
+  },
+  "switch.quarto_de_baby_switch_3_2": {
+    "sensor": "sensor.tuya_lqi_quarto_de_baby",
+    "device_registry_id": "6da3b15a01029825872b325da02151b3",
+    "name": "Quarto de Baby"
+  },
+  "switch.switch_do_led_do_armario_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_switch_do_led_do_armario",
+    "device_registry_id": "a8ab35536025125eff8aae312b9a60be",
+    "name": "Switch do Led do Armário"
+  },
+  "switch.luz_da_garagem_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_luz_da_garagem",
+    "device_registry_id": "32b2b142ec2d361517a5b96045dfa6c3",
+    "name": "Luz da Garagem"
+  },
+  "switch.luz_da_garagem_switch_2_2": {
+    "sensor": "sensor.tuya_lqi_luz_da_garagem",
+    "device_registry_id": "32b2b142ec2d361517a5b96045dfa6c3",
+    "name": "Luz da Garagem"
+  },
+  "switch.luz_do_deposito_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_luz_do_deposito",
+    "device_registry_id": "d2860c4b339c2b2d8c053ac2e82c1a04",
+    "name": "Luz do Depósito"
+  },
+  "switch.apagador_da_luz_externa_da_entrada_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_apagador_da_luz_externa_da_entrada",
+    "device_registry_id": "aab52116fbb058be4cf7b15d86080016",
+    "name": "Apagador da Luz Externa da Entrada"
+  },
+  "switch.luz_do_escritorio_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_luz_do_escritorio",
+    "device_registry_id": "de17951049c0922d991b0115fe28900f",
+    "name": "Luz do Escritório"
+  },
+  "switch.luz_do_escritorio_switch_2_2": {
+    "sensor": "sensor.tuya_lqi_luz_do_escritorio",
+    "device_registry_id": "de17951049c0922d991b0115fe28900f",
+    "name": "Luz do Escritório"
+  },
+  "switch.switch_do_banheiro_de_andre_switch_1_2": {
+    "sensor": "sensor.tuya_lqi_switch_do_banheiro_de_andre",
+    "device_registry_id": "3b9cce254e90adcd565da4cdec403f30",
+    "name": "Switch do Banheiro de André"
+  },
+  "switch.switch_do_banheiro_de_andre_switch_2_2": {
+    "sensor": "sensor.tuya_lqi_switch_do_banheiro_de_andre",
+    "device_registry_id": "3b9cce254e90adcd565da4cdec403f30",
+    "name": "Switch do Banheiro de André"
+  }
+}

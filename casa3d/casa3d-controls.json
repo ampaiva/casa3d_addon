@@ -1,0 +1,497 @@
+{
+  "terreo": [
+    {
+      "entity": "switch.quintal_switch_1_2",
+      "title": "Luz do Quintal",
+      "icon": "mdi:lightbulb",
+      "left": "50%",
+      "top": "7%"
+    },
+    {
+      "entity": "switch.smart_valve_controller_switch_1",
+      "title": "Irrigacao do Quintal",
+      "icon": "mdi:sprinkler-variant",
+      "left": "58%",
+      "top": "7%"
+    },
+    {
+      "entity": "switch.luz_da_area_de_lazer_switch_1",
+      "title": "Luz da Area de Lazer 1",
+      "icon": "mdi:outdoor-lamp",
+      "left": "68%",
+      "top": "18%"
+    },
+    {
+      "entity": "switch.luz_da_area_de_lazer_switch_2",
+      "title": "Luz da Area de Lazer 2",
+      "icon": "mdi:outdoor-lamp",
+      "left": "74%",
+      "top": "18%"
+    },
+    {
+      "entity": "switch.pilar_do_quintal_switch_1_2",
+      "title": "Pilar do Quintal 1",
+      "icon": "mdi:outdoor-lamp",
+      "left": "15.62%",
+      "top": "15.43%"
+    },
+    {
+      "entity": "switch.pilar_do_quintal_switch_2_2",
+      "title": "Pilar do Quintal 2",
+      "icon": "mdi:outdoor-lamp",
+      "left": "38.62%",
+      "top": "26.13%"
+    },
+    {
+      "entity": "switch.luz_da_varanda_switch_1_2",
+      "title": "Luz da Varanda 1",
+      "icon": "mdi:outdoor-lamp",
+      "left": "52.26%",
+      "top": "32.83%"
+    },
+    {
+      "entity": "switch.luz_da_varanda_switch_2_2",
+      "title": "Luz da Varanda 2",
+      "icon": "mdi:outdoor-lamp",
+      "left": "41.60%",
+      "top": "31.28%"
+    },
+    {
+      "entity": "switch.luz_da_varanda_switch_3_2",
+      "title": "Luz da Varanda 3",
+      "icon": "mdi:outdoor-lamp",
+      "left": "59.32%",
+      "top": "30.87%"
+    },
+    {
+      "entity": "switch.luz_da_varanda_switch_4_2",
+      "title": "Luz da Varanda 4",
+      "icon": "mdi:outdoor-lamp",
+      "left": "65%",
+      "top": "23%"
+    },
+    {
+      "entity": "switch.switch_fogao_switch_1",
+      "title": "LED da Bancada",
+      "icon": "mdi:led-strip-variant",
+      "left": "27.06%",
+      "top": "30.60%"
+    },
+    {
+      "entity": "switch.tablado_da_cozinha_switch_1",
+      "title": "Luz da Cozinha",
+      "icon": "mdi:ceiling-light",
+      "left": "31.06%",
+      "top": "31.18%"
+    },
+    {
+      "entity": "switch.luz_da_despensa_switch_1",
+      "title": "Luz da Despensa",
+      "icon": "mdi:lightbulb",
+      "left": "22%",
+      "top": "43%"
+    },
+    {
+      "entity": "switch.bebedouro_socket_1",
+      "title": "Bebedouro",
+      "icon": "mdi:water",
+      "left": "27%",
+      "top": "43%"
+    },
+    {
+      "entity": "switch.geladeira_switch_1_2",
+      "title": "Geladeira 1",
+      "icon": "mdi:fridge",
+      "left": "31.91%",
+      "top": "41.23%"
+    },
+    {
+      "entity": "switch.geladeira_switch_2_2",
+      "title": "Geladeira 2",
+      "icon": "mdi:fridge-outline",
+      "left": "30.63%",
+      "top": "43.57%"
+    },
+    {
+      "entity": "switch.zbeacon_ts011f",
+      "title": "Geladeira Branca",
+      "icon": "mdi:fridge",
+      "left": "29%",
+      "top": "44.5%"
+    },
+    {
+      "entity": "switch.luzes_internas_switch_1_2",
+      "title": "Luz da Sala",
+      "icon": "mdi:ceiling-light",
+      "left": "48.88%",
+      "top": "48.13%"
+    },
+    {
+      "entity": "switch.switch_do_rack_switch_1",
+      "title": "Switch do Rack",
+      "icon": "mdi:television",
+      "left": "33.70%",
+      "top": "46.76%"
+    },
+    {
+      "entity": "switch.luzes_internas_switch_2_2",
+      "title": "Luz da Entrada",
+      "icon": "mdi:ceiling-light",
+      "left": "51%",
+      "top": "62%"
+    },
+    {
+      "entity": "switch.luz_do_corredor_switch_1",
+      "title": "Luz do Corredor",
+      "icon": "mdi:wall-sconce-flat",
+      "left": "58.70%",
+      "top": "44.15%"
+    },
+    {
+      "entity": "switch.luz_do_quarto_switch_1_2",
+      "title": "Luz do Quarto 1",
+      "icon": "mdi:lightbulb",
+      "left": "66%",
+      "top": "47%"
+    },
+    {
+      "entity": "switch.luz_do_quarto_switch_2_2",
+      "title": "Luz do Quarto 2",
+      "icon": "mdi:lightbulb",
+      "left": "70%",
+      "top": "47%"
+    },
+    {
+      "entity": "switch.luz_do_quarto_switch_3_2",
+      "title": "Luz do Quarto 3",
+      "icon": "mdi:lightbulb",
+      "left": "74%",
+      "top": "47%"
+    },
+    {
+      "entity": "switch.2ch_zigbee_switch_module_4_switch_1",
+      "title": "Espelho do Banheiro 1",
+      "icon": "mdi:mirror-rectangle",
+      "left": "70.76%",
+      "top": "59.98%"
+    },
+    {
+      "entity": "switch.2ch_zigbee_switch_module_4_switch_2",
+      "title": "Espelho do Banheiro 2",
+      "icon": "mdi:mirror-rectangle",
+      "left": "64.69%",
+      "top": "59.43%"
+    },
+    {
+      "entity": "switch.quarto_de_baby_switch_1_2",
+      "title": "Quarto de Baby 1",
+      "icon": "mdi:lightbulb",
+      "left": "67.97%",
+      "top": "69.10%"
+    },
+    {
+      "entity": "switch.quarto_de_baby_switch_2_2",
+      "title": "Quarto de Baby 2",
+      "icon": "mdi:lightbulb",
+      "left": "72%",
+      "top": "72%"
+    },
+    {
+      "entity": "switch.quarto_de_baby_switch_3_2",
+      "title": "Quarto de Baby 3",
+      "icon": "mdi:lightbulb",
+      "left": "78.04%",
+      "top": "69.71%"
+    },
+    {
+      "entity": "switch.switch_do_led_do_armario_switch_1_2",
+      "title": "LED do Armario",
+      "icon": "mdi:led-strip-variant",
+      "left": "62.08%",
+      "top": "70.82%"
+    },
+    {
+      "entity": "switch.luz_da_garagem_switch_1_2",
+      "title": "Luz da Garagem 1",
+      "icon": "mdi:garage-variant",
+      "left": "24%",
+      "top": "70%"
+    },
+    {
+      "entity": "switch.luz_da_garagem_switch_2_2",
+      "title": "Luz da Garagem 2",
+      "icon": "mdi:garage-variant",
+      "left": "34%",
+      "top": "70%"
+    },
+    {
+      "entity": "switch.luz_do_deposito_switch_1_2",
+      "title": "Luz do Deposito",
+      "icon": "mdi:lightbulb",
+      "left": "25%",
+      "top": "49%"
+    },
+    {
+      "entity": "switch.tz3000_cayepv1a_ts011f",
+      "title": "Aquecedor",
+      "icon": "mdi:radiator",
+      "left": "76.50%",
+      "top": "24.79%"
+    },
+    {
+      "entity": "switch.luz_do_jardim_switch_1",
+      "title": "Refletor de Baby",
+      "icon": "mdi:outdoor-lamp",
+      "left": "83.81%",
+      "top": "71.75%"
+    },
+    {
+      "entity": "switch.luz_do_jardim_switch_2",
+      "title": "Luz dos Cotons",
+      "icon": "mdi:outdoor-lamp",
+      "left": "13.06%",
+      "top": "81.67%"
+    },
+    {
+      "entity": "switch.luz_do_jardim_switch_2",
+      "title": "Luz dos Cotons",
+      "icon": "mdi:outdoor-lamp",
+      "left": "12.32%",
+      "top": "85.88%"
+    },
+    {
+      "entity": "switch.luz_do_jardim_switch_3",
+      "title": "Luz das Palmeiras",
+      "icon": "mdi:outdoor-lamp",
+      "left": "71.65%",
+      "top": "83.71%"
+    },
+    {
+      "entity": "switch.luz_do_jardim_switch_4",
+      "title": "Luz da Escada",
+      "icon": "mdi:outdoor-lamp",
+      "left": "53.67%",
+      "top": "82.21%"
+    },
+    {
+      "entity": "switch.apagador_da_luz_externa_da_entrada_switch_1_2",
+      "title": "Luz Externa da Entrada",
+      "icon": "mdi:coach-lamp",
+      "left": "50.98%",
+      "top": "66.27%"
+    }
+  ],
+  "superior": [
+    {
+      "entity": "switch.luz_do_escritorio_switch_1_2",
+      "title": "Luz do Escritorio 1",
+      "icon": "mdi:ceiling-light",
+      "left": "58.56%",
+      "top": "30.92%"
+    },
+    {
+      "entity": "switch.luz_do_escritorio_switch_2_2",
+      "title": "Luz do Escritorio 2",
+      "icon": "mdi:ceiling-light",
+      "left": "57.09%",
+      "top": "36.74%"
+    },
+    {
+      "entity": "switch.2l_on_off_controller_zigbee_4_switch_1",
+      "title": "Teto do Escritorio 1",
+      "icon": "mdi:light-recessed",
+      "left": "52.59%",
+      "top": "33.81%"
+    },
+    {
+      "entity": "switch.2l_on_off_controller_zigbee_4_switch_2",
+      "title": "Teto do Escritorio 2",
+      "icon": "mdi:light-recessed",
+      "left": "58.64%",
+      "top": "33.87%"
+    },
+    {
+      "entity": "climate.ar_condicionado",
+      "title": "Ar-condicionado do Escritorio",
+      "icon": "mdi:air-conditioner",
+      "left": "65.30%",
+      "top": "35.89%"
+    },
+    {
+      "entity": "switch.switch_do_banheiro_de_andre_switch_1_2",
+      "title": "Banheiro de Andre 1",
+      "icon": "mdi:lightbulb",
+      "left": "79.24%",
+      "top": "34.02%"
+    },
+    {
+      "entity": "switch.switch_do_banheiro_de_andre_switch_2_2",
+      "title": "Banheiro de Andre 2",
+      "icon": "mdi:mirror-rectangle",
+      "left": "82.81%",
+      "top": "33.91%"
+    }
+  ],
+  "device_positions": {
+    "terreo": {
+      "switch.quintal": {
+        "title": "Luz do Quintal",
+        "left": "50.00%",
+        "top": "7.00%"
+      },
+      "switch.smart_valve_controller": {
+        "title": "Irrigacao do Quintal",
+        "left": "78.79%",
+        "top": "11.05%"
+      },
+      "switch.luz_da_area_de_lazer": {
+        "title": "Luz da Area de Lazer",
+        "left": "71.00%",
+        "top": "18.00%",
+        "model": "Modulo multicanal",
+        "channels": 2
+      },
+      "switch.pilar_do_quintal": {
+        "title": "Pilar do Quintal",
+        "left": "48.50%",
+        "top": "24.00%",
+        "model": "Modulo multicanal",
+        "channels": 2
+      },
+      "switch.luz_da_varanda": {
+        "title": "Luz da Varanda",
+        "left": "59.86%",
+        "top": "39.58%",
+        "model": "Modulo multicanal",
+        "channels": 4
+      },
+      "switch.switch_fogao": {
+        "title": "LED da Bancada",
+        "left": "23.12%",
+        "top": "27.52%"
+      },
+      "switch.tablado_da_cozinha": {
+        "title": "Luz da Cozinha",
+        "left": "34.00%",
+        "top": "35.96%"
+      },
+      "switch.luz_da_despensa": {
+        "title": "Luz da Despensa",
+        "left": "33.93%",
+        "top": "40.78%"
+      },
+      "switch.bebedouro": {
+        "title": "Bebedouro",
+        "left": "27.71%",
+        "top": "41.21%"
+      },
+      "switch.geladeira": {
+        "title": "Geladeira",
+        "left": "33.91%",
+        "top": "38.37%",
+        "model": "Modulo multicanal",
+        "channels": 2
+      },
+      "switch.zbeacon_ts011f": {
+        "title": "Geladeira Branca",
+        "left": "29%",
+        "top": "44.5%"
+      },
+      "switch.luzes_internas": {
+        "title": "Luz da Sala",
+        "left": "56.18%",
+        "top": "58.58%",
+        "model": "Modulo multicanal",
+        "channels": 2
+      },
+      "switch.switch_do_rack": {
+        "title": "Switch do Rack",
+        "left": "30.30%",
+        "top": "46.99%"
+      },
+      "switch.luz_do_corredor": {
+        "title": "Luz do Corredor",
+        "left": "59.71%",
+        "top": "47.72%"
+      },
+      "switch.luz_do_quarto": {
+        "title": "Luz do Quarto",
+        "left": "70.00%",
+        "top": "47.00%",
+        "model": "Modulo multicanal",
+        "channels": 3
+      },
+      "switch.2ch_zigbee_switch_module_4": {
+        "title": "Espelho do Banheiro",
+        "left": "65.92%",
+        "top": "56.00%",
+        "model": "Modulo multicanal",
+        "channels": 2
+      },
+      "switch.quarto_de_baby": {
+        "title": "Quarto de Baby",
+        "left": "69.28%",
+        "top": "65.56%",
+        "model": "Modulo multicanal",
+        "channels": 3
+      },
+      "switch.switch_do_led_do_armario": {
+        "title": "LED do Armario",
+        "left": "64.32%",
+        "top": "75.06%"
+      },
+      "switch.luz_da_garagem": {
+        "title": "Luz da Garagem",
+        "left": "40.42%",
+        "top": "58.68%",
+        "model": "Modulo multicanal",
+        "channels": 2
+      },
+      "switch.luz_do_deposito": {
+        "title": "Luz do Deposito",
+        "left": "25.00%",
+        "top": "49.00%"
+      },
+      "switch.tz3000_cayepv1a_ts011f": {
+        "title": "Aquecedor",
+        "left": "32.93%",
+        "top": "49.71%"
+      },
+      "switch.luz_do_jardim": {
+        "title": "Luz do Jardim",
+        "left": "45.85%",
+        "top": "58.66%",
+        "model": "Girier",
+        "channels": 4
+      },
+      "switch.apagador_da_luz_externa_da_entrada": {
+        "title": "Luz Externa da Entrada",
+        "left": "50.94%",
+        "top": "58.52%"
+      }
+    },
+    "superior": {
+      "switch.luz_do_escritorio": {
+        "title": "Luz do Escritorio",
+        "left": "59.09%",
+        "top": "37.50%",
+        "model": "Modulo multicanal",
+        "channels": 2
+      },
+      "switch.2l_on_off_controller_zigbee_4": {
+        "title": "Teto do Escritorio",
+        "left": "64.20%",
+        "top": "37.47%",
+        "model": "Modulo multicanal",
+        "channels": 2
+      },
+      "switch.switch_do_banheiro_de_andre": {
+        "title": "Banheiro de Andre",
+        "left": "75.37%",
+        "top": "32.05%",
+        "model": "Modulo multicanal",
+        "channels": 2
+      }
+    }
+  }
+}

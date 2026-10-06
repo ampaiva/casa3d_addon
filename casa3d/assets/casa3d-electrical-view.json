@@ -1,0 +1,172 @@
+{
+  "title": "Elétrica",
+  "path": "eletrica",
+  "icon": "mdi:transmission-tower",
+  "type": "sections",
+  "max_columns": 2,
+  "sections": [
+    {
+      "type": "grid",
+      "cards": [
+        {
+          "type": "heading",
+          "heading": "Distribuição agora",
+          "icon": "mdi:flash"
+        },
+        {
+          "type": "entities",
+          "title": "Quadro esquerdo",
+          "show_header_toggle": false,
+          "entities": [
+            {
+              "entity": "sensor.medidor_1_potencia",
+              "name": "Potência total"
+            },
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_a_power",
+              "name": "Fase A"
+            },
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_b_power",
+              "name": "Fase B"
+            },
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_c_power",
+              "name": "Fase C"
+            }
+          ]
+        },
+        {
+          "type": "entities",
+          "title": "Quadro direito",
+          "show_header_toggle": false,
+          "entities": [
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_energia_da_fase_a",
+              "name": "Fase A"
+            },
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_energia_da_fase_b",
+              "name": "Fase B"
+            },
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_energia_da_fase_c",
+              "name": "Fase C"
+            }
+          ]
+        },
+        {
+          "type": "history-graph",
+          "title": "Quadro esquerdo · últimas 3 horas",
+          "hours_to_show": 3,
+          "entities": [
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_a_power",
+              "name": "A"
+            },
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_b_power",
+              "name": "B"
+            },
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_c_power",
+              "name": "C"
+            }
+          ]
+        },
+        {
+          "type": "history-graph",
+          "title": "Quadro direito · últimas 3 horas",
+          "hours_to_show": 3,
+          "entities": [
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_energia_da_fase_a",
+              "name": "A"
+            },
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_energia_da_fase_b",
+              "name": "B"
+            },
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_energia_da_fase_c",
+              "name": "C"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "grid",
+      "cards": [
+        {
+          "type": "markdown",
+          "title": "Circuitos catalogados",
+          "content": "| Equipamento | Quadro | Fases | Ligação | Confiança |\n|---|---|---|---|---|\n| Ar-condicionado do escritório | Esquerdo | B + C | Bifásica | Alta |\n| Ar-condicionado da suíte | Esquerdo | B + C | Bifásica | Alta |\n| Ar-condicionado do André | Esquerdo | A + C | Bifásica | Alta |\n| Geladeira Branca | Esquerdo | C | Monofásica | Alta |\n| Bebedouro | Esquerdo | C | Monofásica | Média |"
+        },
+        {
+          "type": "entities",
+          "title": "Detalhes das fases",
+          "show_header_toggle": false,
+          "entities": [
+            {
+              "type": "section",
+              "label": "Quadro esquerdo"
+            },
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_a_current",
+              "name": "A · corrente"
+            },
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_a_voltage",
+              "name": "A · tensão"
+            },
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_b_current",
+              "name": "B · corrente"
+            },
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_b_voltage",
+              "name": "B · tensão"
+            },
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_c_current",
+              "name": "C · corrente"
+            },
+            {
+              "entity": "sensor.medidor_quadro_esquerdo_phase_c_voltage",
+              "name": "C · tensão"
+            },
+            {
+              "type": "section",
+              "label": "Quadro direito"
+            },
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_corrente_da_fase_a",
+              "name": "A · corrente"
+            },
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_tensao_da_fase_a",
+              "name": "A · tensão"
+            },
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_corrente_da_fase_b",
+              "name": "B · corrente"
+            },
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_tensao_da_fase_b",
+              "name": "B · tensão"
+            },
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_corrente_da_fase_c",
+              "name": "C · corrente"
+            },
+            {
+              "entity": "sensor.zigbee_3_phase_meter_2_tensao_da_fase_c",
+              "name": "C · tensão"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

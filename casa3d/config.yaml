@@ -21,8 +21,6 @@ ingress_port: 8000
 map:
   - config:rw
 
-image: ghcr.io/ampaiva/casa3d_addon/{arch}
-
 options:
   data_dir: "/data"
   ha_url: "http://homeassistant:8123"
@@ -36,4 +34,3 @@ schema:
   ha_token: password
   floor_ground_image: str
   floor_upper_image: str
-
