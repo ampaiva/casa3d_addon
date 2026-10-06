@@ -23,4 +23,5 @@ COPY assets ./assets
 COPY scripts ./scripts
 COPY casa3d-controls.json ./casa3d-controls.json
 
-CMD ["python", "-m", "app.position_editor_server", "--host", "0.0.0.0", "--port", "8000"]
+COPY rootfs /
+RUN chmod a+x /etc/services.d/casa3d/run

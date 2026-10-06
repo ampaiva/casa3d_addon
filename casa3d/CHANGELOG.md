@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Ajusta inicialização para o formato de serviço s6 exigido pela base do Home Assistant.
+
 ## 0.1.2
 
 - Remove mapeamento de porta externa; o acesso passa a ser somente via Ingress.
