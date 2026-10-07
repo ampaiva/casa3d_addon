@@ -4,6 +4,7 @@ import mimetypes
 import os
 import re
 import subprocess
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -107,6 +108,98 @@ def dashboard_config():
     if source.exists():
         return json.loads(source.read_text())["data"]["config"]
     return {"views": []}
+
+
+def zigbee_devices(controls, dashboard):
+    storage = HA_CONFIG / ".storage"
+    def registry(name, field):
+        source = storage / name
+        return json.loads(source.read_text())["data"][field] if source.exists() else []
+
+    entities = {item["entity_id"]: item for item in registry("core.entity_registry", "entities")}
+    devices = {item["id"]: item for item in registry("core.device_registry", "devices")}
+    signals = defaultdict(dict)
+    for entity, entry in entities.items():
+        for kind in ("lqi", "rssi"):
+            if entity.endswith("_" + kind) and entry.get("device_id") and not entry.get("disabled_by"):
+                signals[entry["device_id"]][kind] = entity
+    signal_map = json.loads((ASSETS / "tuya-signal-map.json").read_text())
+    result = {}
+    for view in dashboard.get("views", []):
+        floor = view.get("path")
+        if floor not in controls.get("device_positions", {}):
+            continue
+        positions = controls["device_positions"][floor]
+        nodes = {}
+        physical_ids = {}
+        for control in controls.get(floor, []):
+            entity = control.get("entity", "")
+            key = normalize_device(entity)
+            if key not in positions:
+                continue
+            entry = entities.get(entity, {})
+            device_id = entry.get("device_id")
+            device = devices.get(device_id, {})
+            platform = entry.get("platform", "")
+            identified = platform in ("zha", "zigbee2mqtt", "deconz") or bool(re.search(r"zigbee|PSW-\dCH-ZT", device.get("model") or "", re.I))
+            if device_id:
+                physical_ids[device_id] = key
+            node = nodes.setdefault(key, {"key": key, "is_zigbee": identified, "platform": platform,
+                "device_id": device_id, "model": device.get("model"), "signals": dict(signals[device_id]),
+                "entity": entity, "network": "Sonoff/ZHA" if platform == "zha" else platform})
+            if entity in signal_map:
+                node["signals"]["lqi"] = signal_map[entity]["sensor"]
+
+        source = next((card for card in view.get("cards", []) if card.get("type") == "picture-elements"), {})
+        legacy = [child for element in source.get("elements", [])
+            if any(condition.get("entity") == "input_boolean.casa3d_mostrar_zigbee" for condition in element.get("conditions", []))
+            for child in element.get("elements", [])]
+        anchors = []
+        for element in legacy:
+            if element.get("type") not in ("icon", "state-icon"):
+                continue
+            entity = element.get("entity")
+            entry = entities.get(entity, {})
+            device_id = entry.get("device_id")
+            title = element.get("title", "")
+            network = "Sonoff/ZHA" if "ZHA" in title else "X5/Tuya"
+            key = physical_ids.get(device_id) or (normalize_device(entity) if entity else "zigbee:" + network)
+            style = element.get("style", {})
+            if "left" not in style or "top" not in style:
+                continue
+            positions.setdefault(key, {"title": title.split(" · ")[-1], "left": style["left"], "top": style["top"],
+                "model": devices.get(device_id, {}).get("model") or network})
+            node = nodes.setdefault(key, {"key": key, "signals": dict(signals[device_id]), "entity": entity,
+                "device_id": device_id, "model": positions[key].get("model")})
+            node.update({"is_zigbee": True, "network": network, "icon": element.get("icon", "mdi:access-point-network")})
+            anchors.append((key, pct(style["left"]), pct(style["top"])))
+
+        links = []
+        for image in (element for element in legacy if element.get("type") == "image"):
+            name = Path(image.get("image", "")).name
+            mesh = HA_CONFIG / "www" / "casa3d" / name
+            if not mesh.is_file():
+                mesh = ASSETS / name
+            if not mesh.is_file() or mesh.suffix != ".svg":
+                continue
+            svg = ET.parse(mesh).getroot()
+            _, _, width, height = map(float, svg.attrib["viewBox"].split())
+            def anchor(x, y):
+                candidates = [(abs(px * width / 100 - x) + abs(py * height / 100 - y), key) for key, px, py in anchors]
+                distance, key = min(candidates, default=(float("inf"), None))
+                return key if distance < 3 else None
+            for path in svg.findall(".//{http://www.w3.org/2000/svg}path"):
+                match = re.fullmatch(r"M\s*([\d.]+)[ ,]+([\d.]+)\s*L\s*([\d.]+)[ ,]+([\d.]+)", path.get("d", ""))
+                if not match:
+                    continue
+                x1, y1, x2, y2 = map(float, match.groups())
+                start, end = anchor(x1, y1), anchor(x2, y2)
+                if not start or not end:
+                    continue
+                links.append({"from": start, "to": end, "title": path.findtext("{http://www.w3.org/2000/svg}title", ""),
+                    "color": path.get("stroke", "#0c8cab"), "dashed": bool(path.get("stroke-dasharray")), "opacity": path.get("opacity", "0.5")})
+        result[floor] = {"nodes": nodes, "links": links}
+    return result
 
 
 def floor_images():
@@ -606,6 +699,11 @@ HTML = r"""<!doctype html>
     .live-element svg, .marker svg { width: 22px; height: 22px; fill: currentColor; stroke: none; display: block; }
     .live-element img { width: 100%; height: auto; }
     .marker.on { background: #efc532; color: #242424; }
+    .network-badge { position: absolute; right: -5px; top: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--network-color); border: 1px solid white; font-size: 8px !important; display: grid; place-items: center; pointer-events: none; }
+    .network-info { position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%); padding: 2px 4px; background: rgba(16,24,28,.9); border-radius: 3px; font-size: 9px !important; line-height: 13px !important; white-space: nowrap; pointer-events: none; }
+    .expanded .network-info { top: auto; bottom: calc(100% + 5px); }
+    .mesh { z-index: 1; }
+    .mesh line { stroke-width: 1.5; }
     #connection { color: #a34b16; font-size: 12px; }
     @media (max-width: 700px) {
       header h1, #status { display: none; }
@@ -644,6 +742,7 @@ HTML = r"""<!doctype html>
       <div id="stage" class="stage">
         <img id="map" alt="">
         <div id="haLayer" class="ha-layer"></div>
+        <svg id="mesh" class="wire mesh"></svg>
         <svg id="wires" class="wire"></svg>
       </div>
       <div id="electrical"></div>
@@ -688,6 +787,7 @@ HTML = r"""<!doctype html>
     let editing = false;
     let dashboard = {views: []};
     let icons = {};
+    let zigbee = {};
     let haCards = [];
     let charts = [];
     let haLayerKey = '';
@@ -845,7 +945,7 @@ HTML = r"""<!doctype html>
         const condition = element.conditions?.find(c => c.entity?.startsWith('input_boolean.casa3d_mostrar_'));
         if (!condition) return true;
         if (condition.entity.endsWith('dispositivos')) return false;
-        return condition.entity.endsWith('zigbee') ? layers.zigbee : layers.electric;
+        return condition.entity.endsWith('zigbee') ? false : layers.electric;
       }).flatMap(element => element.conditions?.some(c => c.entity?.startsWith('input_boolean.casa3d_mostrar_')) ? element.elements : [element]);
       mountElements(elements, target);
     }
@@ -878,7 +978,7 @@ HTML = r"""<!doctype html>
       const devices = data.device_positions?.[currentFloor] || {};
       const items = [];
 
-      if (mode() !== 'device') {
+      if (layers.devices && mode() !== 'device') {
         controls.forEach((control, index) => {
           const key = normalizeDevice(control.entity || '');
           items.push({
@@ -895,7 +995,7 @@ HTML = r"""<!doctype html>
         });
       }
 
-      if (mode() !== 'load') {
+      if ((layers.devices && mode() !== 'load') || layers.zigbee) {
         const channelsByDevice = controls.reduce((acc, control) => {
           const key = normalizeDevice(control.entity || '');
           const channel = channelNumber(control.entity);
@@ -913,6 +1013,8 @@ HTML = r"""<!doctype html>
           return acc;
         }, {});
         Object.entries(devices).forEach(([key, point]) => {
+          const network = zigbee[currentFloor]?.nodes[key];
+          if (!layers.devices && !network?.is_zigbee) return;
           const channels = Array.from(channelsByDevice[key] || [1]).sort((a, b) => a - b);
           const isSwitchDevice = key.startsWith('switch.');
           const isBreakerDevice = key === 'switch.tz3000_cayepv1a_ts011f';
@@ -920,7 +1022,8 @@ HTML = r"""<!doctype html>
             kind: 'device',
             key,
             title: point.title || key,
-            entity: key,
+            entity: network?.entity || key,
+            network,
             left: point.left,
             top: point.top,
             model: isBreakerDevice ? 'Disjuntor Zigbee' : (isSwitchDevice ? 'Girier' : (point.model || (channels.length > 1 ? 'Modulo multicanal' : 'Modulo Zigbee'))),
@@ -1034,6 +1137,38 @@ HTML = r"""<!doctype html>
       });
     }
 
+    function renderMesh() {
+      const mesh = document.getElementById('mesh');
+      mesh.replaceChildren();
+      if (!layers.zigbee || floor() === 'eletrica') return;
+      const width = stage.clientWidth, height = stage.clientHeight;
+      mesh.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      for (const link of zigbee[floor()]?.links || []) {
+        const positions = data.device_positions[floor()];
+        const start = positions[link.from], end = positions[link.to];
+        if (!start || !end) continue;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.style.stroke = link.color;
+        for (const [name, value] of Object.entries({x1:parsePct(start.left)*width/100, y1:parsePct(start.top)*height/100, x2:parsePct(end.left)*width/100, y2:parsePct(end.top)*height/100, stroke:link.color, opacity:link.opacity})) line.setAttribute(name, value);
+        if (link.dashed) line.setAttribute('stroke-dasharray', '5 7');
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title'); title.textContent = link.title;
+        line.appendChild(title); mesh.appendChild(line);
+      }
+    }
+
+    function updateNetworkInfo(marker, item) {
+      const network = item.network;
+      if (!layers.zigbee || !network?.is_zigbee) return;
+      const values = Object.entries(network.signals).map(([kind, entity]) => {
+        const state = hass()?.states[entity];
+        const unit = kind === 'rssi' ? ` ${state?.attributes.unit_of_measurement || 'dBm'}` : '';
+        return `${kind.toUpperCase()} ${state?.state || 'Indisponivel'}${unit}`;
+      });
+      const info = marker.querySelector('.network-info');
+      if (info) info.textContent = values.join(' · ') || network.network;
+      marker.title = `${item.title} · ${network.network}${values.length ? ' · ' + values.join(' · ') : ''}`;
+    }
+
     function render() {
       const currentFloor = floor();
       map.src = `assets/${images[currentFloor]}`;
@@ -1041,7 +1176,7 @@ HTML = r"""<!doctype html>
       renderHaLayers();
 
       stage.querySelectorAll('.marker').forEach(node => node.remove());
-      const items = layers.devices && currentFloor !== 'eletrica' ? itemsForFloor() : [];
+      const items = (layers.devices || layers.zigbee) && currentFloor !== 'eletrica' ? itemsForFloor() : [];
 
       items.forEach(item => {
         const marker = document.createElement('button');
@@ -1085,6 +1220,14 @@ HTML = r"""<!doctype html>
         } else {
           marker.innerHTML = item.kind === 'device' ? '<span class="device-symbol"></span>' : '<span>L</span>';
           if (item.kind === 'load') marker.innerHTML = iconHtml(item.icon || 'mdi:lightbulb');
+          else if (item.network?.icon && !item.entity?.startsWith('switch.')) marker.innerHTML = iconHtml(item.network.icon);
+        }
+        if (layers.zigbee && item.network?.is_zigbee) {
+          marker.style.setProperty('--network-color', item.network.network === 'Sonoff/ZHA' ? '#0c8cab' : '#c16232');
+          const badge = document.createElement('span'); badge.className = 'network-badge'; badge.textContent = 'Z';
+          const info = document.createElement('span'); info.className = 'network-info';
+          marker.append(badge, info);
+          updateNetworkInfo(marker, item);
         }
         if (selected && markerId(selected) === markerId(item)) marker.classList.add('selected');
         marker.addEventListener('pointerdown', event => {
@@ -1121,6 +1264,7 @@ HTML = r"""<!doctype html>
         stage.appendChild(marker);
       });
       renderWires(items);
+      renderMesh();
 
       list.innerHTML = '';
       items.forEach(item => {
@@ -1200,7 +1344,7 @@ HTML = r"""<!doctype html>
       });
     }
     modeSelect.addEventListener('change', () => { selected = null; render(); });
-    map.addEventListener('load', () => renderWires(itemsForFloor()));
+    map.addEventListener('load', () => { renderWires(itemsForFloor()); renderMesh(); });
     window.addEventListener('resize', render);
 
     document.getElementById('save').addEventListener('click', async () => {
@@ -1226,6 +1370,7 @@ HTML = r"""<!doctype html>
       data = payload.controls;
       images = payload.images;
       dashboard = payload.dashboard;
+      zigbee = payload.zigbee;
       icons = await (await fetch('assets/mdi-icons.json')).json();
       if (!hass()) document.getElementById('connection').textContent = 'As visoes ao vivo ficam disponiveis dentro do Home Assistant.';
       Object.keys(images).forEach(name => {
@@ -1242,6 +1387,11 @@ HTML = r"""<!doctype html>
       render();
       setInterval(() => {
         haCards.forEach(update => update());
+        const items = itemsForFloor();
+        stage.querySelectorAll('.marker').forEach(marker => {
+          const item = items.find(item => markerId(item) === marker.dataset.id);
+          if (item) updateNetworkInfo(marker, item);
+        });
         stage.querySelectorAll('.marker.load').forEach(marker => {
           const item = itemsForFloor().find(item => markerId(item) === marker.dataset.id);
           marker.classList.toggle('on', hass()?.states[item?.entity]?.state === 'on');
@@ -1288,7 +1438,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/controls":
             controls = load_controls()
-            self.send_json(200, {"controls": controls, "images": floor_images(), "dashboard": dashboard_config()})
+            dashboard = dashboard_config()
+            network = zigbee_devices(controls, dashboard)
+            self.send_json(200, {"controls": controls, "images": floor_images(), "dashboard": dashboard, "zigbee": network})
             return
         if path.startswith("/assets/"):
             name = Path(path.removeprefix("/assets/")).name
