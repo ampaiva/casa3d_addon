@@ -1011,7 +1011,7 @@ HTML = r"""<!doctype html>
       const width = stage.clientWidth;
       const height = stage.clientHeight;
       wires.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      if (mode() === 'load') return;
+      if (!layers.devices || floor() === 'eletrica' || mode() === 'load') return;
       const devices = new Map(items.filter(item => item.kind === 'device').map(item => [item.key, item]));
       const loads = (data[floor()] || []).map((control, index) => ({
         key: normalizeDevice(control.entity || ''),
