@@ -11,8 +11,10 @@ from urllib.parse import unquote
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CONTROLS = ROOT / "casa3d-controls.json"
+DATA_DIR = Path(os.getenv("CASA3D_DATA_DIR", str(ROOT)))
+CONTROLS = DATA_DIR / "casa3d-controls.json"
 ASSETS = ROOT / "assets"
+HA_CONFIG = Path(os.getenv("CASA3D_HA_CONFIG", "/config"))
 FLOOR_IMAGES = {
     "terreo": "casa_3d_terreo-v18.webp",
     "superior": "casa_3d_superior-original.webp",
@@ -94,7 +96,17 @@ def ensure_device_positions(data):
 
 
 def load_controls():
+    if not CONTROLS.exists():
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        CONTROLS.write_bytes((ROOT / "casa3d-controls.json").read_bytes())
     return ensure_device_positions(json.loads(CONTROLS.read_text()))
+
+
+def dashboard_config():
+    source = HA_CONFIG / ".storage" / "lovelace.lovelace_casa_3d"
+    if source.exists():
+        return json.loads(source.read_text())["data"]["config"]
+    return {"views": []}
 
 
 def floor_images():
@@ -106,6 +118,10 @@ def floor_images():
             options = {}
         images["terreo"] = options.get("floor_ground_image") or images["terreo"]
         images["superior"] = options.get("floor_upper_image") or images["superior"]
+    for view in dashboard_config().get("views", []):
+        for card in view.get("cards", []):
+            if view.get("path") in images and card.get("type") == "picture-elements":
+                images[view["path"]] = card["image"].rsplit("/", 1)[-1]
     return images
 
 
@@ -132,7 +148,8 @@ HTML = r"""<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Casa 3D - Editor de posicoes</title>
+  <title>Casa 3D</title>
+  <script src="assets/lucide.min.js"></script>
   <style>
     :root {
       color-scheme: light;
@@ -545,28 +562,76 @@ HTML = r"""<!doctype html>
       aside { border-left: 0; border-top: 1px solid var(--line); }
       header { height: auto; min-height: 56px; align-items: flex-start; padding: 12px; }
     }
+    header { height: 44px; padding: 0 10px; gap: 8px; }
+    h1 { font-size: 15px; white-space: nowrap; }
+    main { height: calc(100dvh - 44px); grid-template-columns: minmax(0, 1fr); }
+    aside, .edit-only { display: none; }
+    body.editing main { grid-template-columns: minmax(0, 1fr) 250px; }
+    body.editing aside { display: block; padding: 10px; }
+    body.editing .edit-only { display: inline-flex; }
+    body.editing .details p, .legend { display: none; }
+    .stageWrap { padding: 0; position: relative; }
+    .stage { width: 100%; max-width: 1400px; border: 0; touch-action: pan-y; }
+    body.editing .stage { touch-action: none; }
+    .status { min-width: 0; }
+    .toolbar { flex-wrap: nowrap; gap: 4px; }
+    .icon-button { width: 34px; height: 34px; padding: 6px; min-height: 34px; display: grid; place-items: center; }
+    .icon-button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
+    .icon-button[aria-pressed="true"] { color: #047b9d; background: #e0f3f7; border-color: #72bacb; }
+    .layer-tools { display: flex; gap: 4px; border-left: 1px solid var(--line); padding-left: 6px; }
+    .marker { cursor: pointer; }
+    body.editing .marker { cursor: grab; }
+    .marker.module.device-image { min-width: 0; }
+    .channel-list { grid-template-columns: 1fr; max-width: 240px; white-space: normal; width: max-content; }
+    .channel-list span { padding: 3px; cursor: pointer; pointer-events: auto; }
+    .ha-layer { position: absolute; inset: 0; pointer-events: none; }
+    .ha-layer > * { pointer-events: auto; display: block; --ha-card-border-width: 0; --ha-card-border-radius: 0; --ha-card-box-shadow: none; }
+    #electrical { display: none; padding: 12px; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body.electrical-page #electrical { display: grid; }
+    body.electrical-page .stage { display: none; }
+    .ha-section { display: grid; align-content: start; gap: 12px; min-width: 0; }
+    #connection { color: #a34b16; font-size: 12px; }
+    @media (max-width: 700px) {
+      header h1, #status { display: none; }
+      header { justify-content: center; }
+      button, select { font-size: 12px; padding: 0 6px; }
+      .toolbar { width: 100%; justify-content: space-between; }
+      body.editing main { grid-template-columns: 1fr; }
+      body.editing aside { position: fixed; bottom: 0; left: 0; right: 0; max-height: 30dvh; z-index: 25; }
+      body.editing .stageWrap { padding-bottom: 30dvh; }
+      #electrical { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Casa 3D - Editor de posicoes</h1>
+    <h1>Casa 3D</h1>
     <div class="toolbar">
-      <select id="floor"></select>
-      <select id="mode">
+      <select id="floor" aria-label="Visao"></select>
+      <div class="layer-tools" aria-label="Camadas">
+        <button class="icon-button" id="devicesLayer" title="Dispositivos" aria-label="Dispositivos" aria-pressed="true"><i data-lucide="circuit-board"></i></button>
+        <button class="icon-button" id="zigbeeLayer" title="Rede Zigbee" aria-label="Rede Zigbee" aria-pressed="false"><i data-lucide="network"></i></button>
+        <button class="icon-button" id="electricLayer" title="Mapa eletrico" aria-label="Mapa eletrico" aria-pressed="false"><i data-lucide="utility-pole"></i></button>
+      </div>
+      <select id="mode" class="edit-only" aria-label="Pontos">
         <option value="all">Dispositivos e cargas</option>
         <option value="device">Dispositivos fisicos</option>
         <option value="load">Lampadas e cargas</option>
       </select>
-      <button id="save" class="primary">Salvar</button>
-      <span id="status" class="status"></span>
+      <button id="edit" class="icon-button" title="Editar posicoes" aria-label="Editar posicoes" aria-pressed="false"><i data-lucide="square-pen"></i></button>
+      <button id="save" class="primary edit-only">Salvar</button>
+      <span id="status" class="status edit-only"></span>
     </div>
   </header>
   <main>
     <section class="stageWrap">
       <div id="stage" class="stage">
         <img id="map" alt="">
+        <div id="haLayer" class="ha-layer"></div>
         <svg id="wires" class="wire"></svg>
       </div>
+      <div id="electrical"></div>
+      <div id="connection" role="status"></div>
     </section>
     <aside>
       <div class="legend">
@@ -604,6 +669,73 @@ HTML = r"""<!doctype html>
     let images;
     let selected = null;
     let dragging = null;
+    let editing = false;
+    let dashboard = {views: []};
+    let helpers;
+    let haCards = [];
+    let haLayerKey = '';
+    const layers = {devices: true, zigbee: false, electric: false};
+    const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    function hass() {
+      try { return window.parent.document.querySelector('home-assistant')?.hass; }
+      catch { return null; }
+    }
+
+    function moreInfo(entity) {
+      const host = window.parent.document.querySelector('home-assistant');
+      host?.dispatchEvent(new window.parent.CustomEvent('hass-more-info', {detail: {entityId: entity}, bubbles: true, composed: true}));
+    }
+
+    async function toggleEntity(entity) {
+      const ha = hass();
+      if (!ha) return;
+      if (!['switch', 'light', 'input_boolean'].includes(entity.split('.')[0])) return moreInfo(entity);
+      try { await ha.callService('homeassistant', 'toggle', {entity_id: entity}); }
+      catch { document.getElementById('connection').textContent = 'Nao foi possivel acionar o dispositivo.'; }
+    }
+
+    async function mountCard(config, target) {
+      if (!helpers || !hass()) return;
+      const card = helpers.createCardElement(config);
+      card.hass = hass();
+      card.addEventListener('hass-more-info', event => { event.stopPropagation(); moreInfo(event.detail.entityId); });
+      target.appendChild(card);
+      haCards.push(card);
+    }
+
+    function renderHaLayers() {
+      const key = JSON.stringify([floor(), layers.zigbee, layers.electric]);
+      if (key === haLayerKey) return;
+      haLayerKey = key;
+      const target = document.getElementById('haLayer');
+      const electrical = document.getElementById('electrical');
+      target.replaceChildren();
+      electrical.replaceChildren();
+      haCards = [];
+      document.body.classList.toggle('electrical-page', floor() === 'eletrica');
+      const view = dashboard.views.find(v => v.path === floor());
+      if (!view) return;
+      if (floor() === 'eletrica') {
+        for (const section of view.sections || []) {
+          const column = document.createElement('div');
+          column.className = 'ha-section';
+          electrical.appendChild(column);
+          for (const config of section.cards || []) mountCard(config, column);
+        }
+        return;
+      }
+      const source = view.cards?.find(c => c.type === 'picture-elements');
+      if (!source) return;
+      const elements = (source.elements || []).filter(element => {
+        if (element.entity?.startsWith('input_boolean.casa3d_mostrar_')) return false;
+        const condition = element.conditions?.find(c => c.entity?.startsWith('input_boolean.casa3d_mostrar_'));
+        if (!condition) return true;
+        if (condition.entity.endsWith('dispositivos')) return false;
+        return condition.entity.endsWith('zigbee') ? layers.zigbee : layers.electric;
+      }).flatMap(element => element.conditions?.some(c => c.entity?.startsWith('input_boolean.casa3d_mostrar_')) ? element.elements : [element]);
+      mountCard({...source, elements}, target);
+    }
 
     const normalizeDevice = (entity) => entity
       .replace(/_switch_[1-4](_2)?$/, '')
@@ -643,6 +775,7 @@ HTML = r"""<!doctype html>
             index,
             title: control.title || control.entity,
             entity: control.entity,
+            icon: control.icon,
             left: control.left,
             top: control.top
           });
@@ -792,9 +925,10 @@ HTML = r"""<!doctype html>
       const currentFloor = floor();
       map.src = `assets/${images[currentFloor]}`;
       map.alt = `Mapa ${currentFloor}`;
+      renderHaLayers();
 
       stage.querySelectorAll('.marker').forEach(node => node.remove());
-      const items = itemsForFloor();
+      const items = layers.devices && currentFloor !== 'eletrica' ? itemsForFloor() : [];
 
       items.forEach(item => {
         const marker = document.createElement('button');
@@ -814,6 +948,7 @@ HTML = r"""<!doctype html>
         marker.style.setProperty('--x', item.left);
         marker.style.setProperty('--y', item.top);
         marker.title = isGirierImage ? `${item.model} ${channelText} · ${item.title}` : (isPhotoDevice || isModule ? `${item.model} · ${item.title}` : item.title);
+        marker.setAttribute('aria-label', marker.title);
         marker.dataset.id = markerId(item);
         if (isBreakerImage) {
           marker.innerHTML = '<img class="device-photo" src="assets/tongou-breaker-to-q-sy2-jzt.webp?v=1" alt="">';
@@ -828,7 +963,7 @@ HTML = r"""<!doctype html>
                 return `<span class="channel" data-channel="${channel}" title="Canal ${channel}: ${names}"><span class="channel-label">Canal ${channel}: ${names}</span></span>`;
               })
               .join('') +
-            `<span class="channel-list">${channelItems.map(({ channel, names }) => `<span>${channel}: ${names}</span>`).join('')}</span>`;
+            `<span class="channel-list">${channelItems.map(({ channel, names }) => `<span data-entity="${escapeHtml((data[floor()] || []).find(c => normalizeDevice(c.entity) === item.key && channelNumber(c.entity) === channel)?.entity || '')}" tabindex="0" role="button">${channel}: ${escapeHtml(names)}</span>`).join('')}</span>`;
         } else if (isModule) {
           marker.innerHTML = `<span class="module-count">${item.channels.length}</span>` +
             item.channels
@@ -836,9 +971,23 @@ HTML = r"""<!doctype html>
               .join('');
         } else {
           marker.innerHTML = item.kind === 'device' ? '<span class="device-symbol"></span>' : '<span>L</span>';
+          if (item.kind === 'load' && helpers) {
+            const icon = window.parent.document.createElement('ha-icon');
+            icon.setAttribute('icon', item.icon || 'mdi:lightbulb');
+            icon.style.cssText = 'width:20px;height:20px;--mdc-icon-size:20px;pointer-events:none';
+            marker.replaceChildren(icon);
+          }
         }
         if (selected && markerId(selected) === markerId(item)) marker.classList.add('selected');
         marker.addEventListener('pointerdown', event => {
+          const channel = event.target.closest('.channel-list span');
+          if (channel && !editing) { event.preventDefault(); toggleEntity(channel.dataset.entity); return; }
+          if (!editing) {
+            event.preventDefault();
+            if (item.kind === 'load') toggleEntity(item.entity);
+            else { selected = isExpanded ? null : item; render(); }
+            return;
+          }
           event.preventDefault();
           marker.setPointerCapture(event.pointerId);
           const wasSelected = selected && markerId(selected) === markerId(item);
@@ -851,6 +1000,15 @@ HTML = r"""<!doctype html>
             startY: event.clientY
           };
           if (!wasSelected) selectItem(item);
+        });
+        marker.addEventListener('keydown', event => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          const channel = event.target.closest('.channel-list span');
+          if (channel && !editing) toggleEntity(channel.dataset.entity);
+          else if (editing) selectItem(item);
+          else if (item.kind === 'load') toggleEntity(item.entity);
+          else { selected = isExpanded ? null : item; render(); }
         });
         stage.appendChild(marker);
       });
@@ -885,6 +1043,7 @@ HTML = r"""<!doctype html>
     }
 
     window.addEventListener('pointermove', event => {
+      if (!editing) return;
       if (!dragging || event.pointerId !== dragging.pointerId) return;
       const dx = event.clientX - dragging.startX;
       const dy = event.clientY - dragging.startY;
@@ -916,6 +1075,22 @@ HTML = r"""<!doctype html>
     leftField.addEventListener('change', updateSelectedFromFields);
     topField.addEventListener('change', updateSelectedFromFields);
     floorSelect.addEventListener('change', () => { selected = null; render(); });
+    document.getElementById('edit').addEventListener('click', () => {
+      editing = !editing;
+      document.body.classList.toggle('editing', editing);
+      document.getElementById('edit').setAttribute('aria-pressed', String(editing));
+      if (floor() === 'eletrica' && editing) floorSelect.value = 'terreo';
+      selected = null;
+      dragging = null;
+      render();
+    });
+    for (const [key, id] of Object.entries({devices:'devicesLayer', zigbee:'zigbeeLayer', electric:'electricLayer'})) {
+      document.getElementById(id).addEventListener('click', () => {
+        layers[key] = !layers[key];
+        document.getElementById(id).setAttribute('aria-pressed', String(layers[key]));
+        render();
+      });
+    }
     modeSelect.addEventListener('change', () => { selected = null; render(); });
     map.addEventListener('load', () => renderWires(itemsForFloor()));
     window.addEventListener('resize', render);
@@ -937,18 +1112,29 @@ HTML = r"""<!doctype html>
     });
 
     async function boot() {
+      lucide.createIcons();
       const response = await fetch('api/controls');
       const payload = await response.json();
       data = payload.controls;
       images = payload.images;
+      dashboard = payload.dashboard;
+      try {
+        helpers = await window.parent.loadCardHelpers?.();
+      } catch {}
+      if (!helpers) document.getElementById('connection').textContent = 'As visoes ao vivo ficam disponiveis dentro do Home Assistant.';
       Object.keys(images).forEach(name => {
         const option = document.createElement('option');
         option.value = name;
         option.textContent = name === 'terreo' ? 'Terreo' : 'Superior';
         floorSelect.appendChild(option);
       });
+      const option = document.createElement('option');
+      option.value = 'eletrica';
+      option.textContent = 'Eletrica';
+      floorSelect.appendChild(option);
       status.textContent = 'Pronto';
       render();
+      setInterval(() => { const ha = hass(); if (ha) haCards.forEach(card => { card.hass = ha; }); }, 1000);
     }
 
     boot();
@@ -990,12 +1176,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/controls":
             controls = load_controls()
-            save_controls(controls)
-            self.send_json(200, {"controls": controls, "images": floor_images()})
+            self.send_json(200, {"controls": controls, "images": floor_images(), "dashboard": dashboard_config()})
             return
         if path.startswith("/assets/"):
             name = Path(path.removeprefix("/assets/")).name
             file_path = ASSETS / name
+            current_asset = HA_CONFIG / "www" / "casa3d" / name
+            if current_asset.is_file():
+                file_path = current_asset
             if not file_path.exists() or not file_path.is_file():
                 self.send_error(404)
                 return
@@ -1017,6 +1205,9 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/assets/"):
             name = Path(path.removeprefix("/assets/")).name
             file_path = ASSETS / name
+            current_asset = HA_CONFIG / "www" / "casa3d" / name
+            if current_asset.is_file():
+                file_path = current_asset
             if not file_path.exists() or not file_path.is_file():
                 self.send_error(404)
                 return
@@ -1032,7 +1223,6 @@ class Handler(BaseHTTPRequestHandler):
         try:
             payload = json.loads(self.rfile.read(length))
             save_controls(payload)
-            rebuild_dashboard()
         except Exception as exc:
             self.send_json(400, {"error": str(exc)})
             return
