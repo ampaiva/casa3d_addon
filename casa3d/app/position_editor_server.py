@@ -704,6 +704,36 @@ HTML = r"""<!doctype html>
     .live-element svg, .marker svg { width: 22px; height: 22px; fill: currentColor; stroke: none; display: block; }
     .live-element img { width: 100%; height: auto; }
     .marker.on { background: #efc532; color: #242424; }
+    .floor-fixture {
+      position: absolute;
+      left: var(--x);
+      top: var(--y);
+      transform: translate(-50%, -50%);
+      width: clamp(8px, 1.15%, 18px);
+      aspect-ratio: 1;
+      min-height: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      z-index: 1;
+      overflow: visible;
+    }
+    .floor-fixture svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .floor-fixture .spot-lens { fill: #555b55; transition: fill 180ms ease; }
+    .floor-fixture::before {
+      content: '';
+      position: absolute;
+      inset: -180%;
+      pointer-events: none;
+      border-radius: 50%;
+      background: radial-gradient(circle, #ffdd9b88 0%, #ffc66a38 30%, #ffc66a00 70%);
+      opacity: 0;
+      transition: opacity 180ms ease;
+    }
+    .floor-fixture.on::before { opacity: 1; }
+    .floor-fixture.on .spot-lens { fill: #fff1c5; filter: drop-shadow(0 0 2px #ffc86c); }
+    .floor-fixture:focus-visible { outline: 2px solid #0f8db3; outline-offset: 4px; }
     .network-badge { position: absolute; right: -5px; top: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--network-color); border: 1px solid white; font-size: 8px !important; display: grid; place-items: center; pointer-events: none; }
     .network-info { position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%); padding: 2px 4px; background: rgba(16,24,28,.9); border-radius: 3px; font-size: 9px !important; line-height: 13px !important; white-space: nowrap; pointer-events: none; }
     .expanded .network-info { top: auto; bottom: calc(100% + 5px); }
@@ -793,6 +823,7 @@ HTML = r"""<!doctype html>
     let editing = false;
     let dashboard = {views: []};
     let icons = {};
+    let fixtures = {};
     let zigbee = {};
     let haCards = [];
     let charts = [];
@@ -820,6 +851,36 @@ HTML = r"""<!doctype html>
 
     function iconHtml(name) {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[name] || icons['mdi:lightbulb'] || ''}"></path></svg>`;
+    }
+
+    function updateFixtures() {
+      stage.querySelectorAll('.floor-fixture').forEach(node => {
+        const state = hass()?.states[node.dataset.entity]?.state;
+        node.classList.toggle('on', state === 'on');
+        node.setAttribute('aria-pressed', String(state === 'on'));
+        node.disabled = !hass() || !['on', 'off'].includes(state);
+      });
+    }
+
+    function renderFixtures() {
+      stage.querySelectorAll('.floor-fixture').forEach(node => node.remove());
+      for (const fixture of fixtures[floor()] || []) {
+        if (fixture.type !== 'recessed-ground-spot') continue;
+        for (const [index, point] of fixture.points.entries()) {
+          const node = document.createElement('button');
+          node.type = 'button';
+          node.className = 'floor-fixture';
+          node.dataset.entity = fixture.entity;
+          node.style.setProperty('--x', point.left);
+          node.style.setProperty('--y', point.top);
+          node.title = `${fixture.title} - spot ${index + 1}`;
+          node.setAttribute('aria-label', node.title);
+          node.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#262b28" stroke="#969d98" stroke-width="1.2"/><circle cx="12" cy="12" r="8.5" fill="#101612"/><circle class="spot-lens" cx="12" cy="12" r="5.8"/><path d="M7 4.6A9 9 0 0 1 17 4.6" fill="none" stroke="#d8ded8" stroke-width="1"/><circle cx="3.7" cy="12" r=".65" fill="#bac1bc"/><circle cx="20.3" cy="12" r=".65" fill="#bac1bc"/></svg>';
+          node.addEventListener('click', () => toggleEntity(fixture.entity));
+          stage.appendChild(node);
+        }
+      }
+      updateFixtures();
     }
 
     function entityValue(entity) {
@@ -1146,6 +1207,7 @@ HTML = r"""<!doctype html>
       if (!layers.devices || floor() === 'eletrica' || mode() === 'load') return;
       const devices = new Map(items.filter(item => item.kind === 'device').map(item => [item.key, item]));
       const loads = (data[floor()] || []).map((control, index) => ({
+        entity: control.entity,
         key: normalizeDevice(control.entity || ''),
         channel: channelNumber(control.entity),
         left: control.left,
@@ -1156,12 +1218,14 @@ HTML = r"""<!doctype html>
         const device = devices.get(load.key);
         if (!device) return;
         const port = channelPortPx(device, load.channel);
+        const fixture = (fixtures[floor()] || []).find(group => group.entity === load.entity);
+        const endpoint = fixture?.points[0] || load;
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.classList.add('channel-wire');
         line.setAttribute('x1', port.x);
         line.setAttribute('y1', port.y);
-        line.setAttribute('x2', parsePct(load.left) * width / 100);
-        line.setAttribute('y2', parsePct(load.top) * height / 100);
+        line.setAttribute('x2', parsePct(endpoint.left) * width / 100);
+        line.setAttribute('y2', parsePct(endpoint.top) * height / 100);
         wires.appendChild(line);
       });
     }
@@ -1203,6 +1267,7 @@ HTML = r"""<!doctype html>
       map.src = `assets/${images[currentFloor]}`;
       map.alt = `Mapa ${currentFloor}`;
       renderHaLayers();
+      renderFixtures();
 
       stage.querySelectorAll('.marker').forEach(node => node.remove());
       const items = (layers.devices || layers.zigbee) && currentFloor !== 'eletrica' ? itemsForFloor() : [];
@@ -1400,6 +1465,7 @@ HTML = r"""<!doctype html>
       images = payload.images;
       dashboard = payload.dashboard;
       zigbee = payload.zigbee;
+      fixtures = payload.fixtures || {};
       channelNames = payload.channel_names || {};
       icons = await (await fetch('assets/mdi-icons.json')).json();
       if (!hass()) document.getElementById('connection').textContent = 'As visoes ao vivo ficam disponiveis dentro do Home Assistant.';
@@ -1417,6 +1483,7 @@ HTML = r"""<!doctype html>
       render();
       refreshNames();
       setInterval(() => {
+        updateFixtures();
         haCards.forEach(update => update());
         const items = itemsForFloor();
         stage.querySelectorAll('.marker').forEach(marker => {
@@ -1472,6 +1539,7 @@ class Handler(BaseHTTPRequestHandler):
             dashboard = dashboard_config()
             network = zigbee_devices(controls, dashboard)
             self.send_json(200, {"controls": controls, "images": floor_images(), "dashboard": dashboard, "zigbee": network,
+                                 "fixtures": json.loads((ASSETS / "floor-fixtures.json").read_text()),
                                  "channel_names": tuya_names.read_cache(DATA_DIR).get("names", {})})
             return
         if path.startswith("/assets/"):

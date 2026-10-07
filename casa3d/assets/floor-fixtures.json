@@ -1,0 +1,21 @@
+{
+  "terreo": [
+    {
+      "entity": "switch.luz_do_jardim_switch_4",
+      "title": "Luz da Escada",
+      "type": "recessed-ground-spot",
+      "points": [
+        {"left": "51.95%", "top": "70.50%"},
+        {"left": "51.95%", "top": "72.35%"},
+        {"left": "51.95%", "top": "74.20%"},
+        {"left": "51.95%", "top": "76.05%"},
+        {"left": "51.95%", "top": "78.15%"},
+        {"left": "51.95%", "top": "80.30%"},
+        {"left": "51.95%", "top": "82.50%"},
+        {"left": "51.95%", "top": "84.80%"},
+        {"left": "51.95%", "top": "87.00%"}
+      ]
+    }
+  ],
+  "superior": []
+}
