@@ -10,6 +10,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote
 
+try:
+    from . import tuya_names
+except ImportError:
+    import tuya_names
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = Path(os.getenv("CASA3D_DATA_DIR", str(ROOT)))
@@ -733,6 +738,7 @@ HTML = r"""<!doctype html>
         <option value="load">Lampadas e cargas</option>
       </select>
       <button id="edit" class="icon-button" title="Editar posicoes" aria-label="Editar posicoes" aria-pressed="false"><i data-lucide="square-pen"></i></button>
+      <button id="refreshNames" class="icon-button" title="Atualizar nomes Tuya" aria-label="Atualizar nomes Tuya"><i data-lucide="refresh-cw"></i></button>
       <button id="save" class="primary edit-only">Salvar</button>
       <span id="status" class="status edit-only"></span>
     </div>
@@ -959,6 +965,29 @@ HTML = r"""<!doctype html>
     };
     const parsePct = (value) => Number(String(value).replace('%', ''));
     const fmtPct = (value) => `${Math.max(0, Math.min(100, value)).toFixed(2)}%`;
+    let channelNames = {};
+    const controlTitle = control => channelNames[control.entity] || control.title || control.entity;
+
+    async function refreshNames(force = false) {
+      const button = document.getElementById('refreshNames');
+      button.disabled = true;
+      try {
+        const response = await fetch('api/channel-names', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({force})
+        });
+        if (!response.ok) throw new Error('Falha ao atualizar nomes Tuya.');
+        const result = await response.json();
+        channelNames = result.names || channelNames;
+        button.title = result.error || 'Nomes Tuya atualizados';
+        if (force && result.error) alert(result.error);
+        render();
+      } catch (error) {
+        button.title = 'Falha ao atualizar nomes Tuya; nomes anteriores preservados.';
+        if (force) alert(button.title);
+      } finally { button.disabled = false; }
+    }
+    document.getElementById('refreshNames').addEventListener('click', () => refreshNames(true));
 
     function markerId(item) {
       return `${item.kind}:${item.key}:${item.index ?? ''}`;
@@ -986,7 +1015,7 @@ HTML = r"""<!doctype html>
             key,
             channel: channelNumber(control.entity),
             index,
-            title: control.title || control.entity,
+            title: controlTitle(control),
             entity: control.entity,
             icon: control.icon,
             left: control.left,
@@ -1008,7 +1037,7 @@ HTML = r"""<!doctype html>
           const channel = channelNumber(control.entity);
           if (!acc[key]) acc[key] = {};
           if (!acc[key][channel]) acc[key][channel] = [];
-          const title = control.title || control.entity;
+          const title = controlTitle(control);
           if (!acc[key][channel].includes(title)) acc[key][channel].push(title);
           return acc;
         }, {});
@@ -1208,7 +1237,7 @@ HTML = r"""<!doctype html>
           marker.innerHTML = `<img class="device-photo" src="assets/girier-${item.channels.length}ch-module.png?v=4" alt="">` +
             channelItems
               .map(({ channel, names }) => {
-                return `<span class="channel" data-channel="${channel}" title="Canal ${channel}: ${names}"><span class="channel-label">Canal ${channel}: ${names}</span></span>`;
+                return `<span class="channel" data-channel="${channel}" title="Canal ${channel}: ${escapeHtml(names)}"><span class="channel-label">Canal ${channel}: ${escapeHtml(names)}</span></span>`;
               })
               .join('') +
             `<span class="channel-list">${channelItems.map(({ channel, names }) => `<span data-entity="${escapeHtml((data[floor()] || []).find(c => normalizeDevice(c.entity) === item.key && channelNumber(c.entity) === channel)?.entity || '')}" tabindex="0" role="button">${channel}: ${escapeHtml(names)}</span>`).join('')}</span>`;
@@ -1371,6 +1400,7 @@ HTML = r"""<!doctype html>
       images = payload.images;
       dashboard = payload.dashboard;
       zigbee = payload.zigbee;
+      channelNames = payload.channel_names || {};
       icons = await (await fetch('assets/mdi-icons.json')).json();
       if (!hass()) document.getElementById('connection').textContent = 'As visoes ao vivo ficam disponiveis dentro do Home Assistant.';
       Object.keys(images).forEach(name => {
@@ -1385,6 +1415,7 @@ HTML = r"""<!doctype html>
       floorSelect.appendChild(option);
       status.textContent = 'Pronto';
       render();
+      refreshNames();
       setInterval(() => {
         haCards.forEach(update => update());
         const items = itemsForFloor();
@@ -1440,7 +1471,8 @@ class Handler(BaseHTTPRequestHandler):
             controls = load_controls()
             dashboard = dashboard_config()
             network = zigbee_devices(controls, dashboard)
-            self.send_json(200, {"controls": controls, "images": floor_images(), "dashboard": dashboard, "zigbee": network})
+            self.send_json(200, {"controls": controls, "images": floor_images(), "dashboard": dashboard, "zigbee": network,
+                                 "channel_names": tuya_names.read_cache(DATA_DIR).get("names", {})})
             return
         if path.startswith("/assets/"):
             name = Path(path.removeprefix("/assets/")).name
@@ -1480,6 +1512,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        if self.path == "/api/channel-names":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                payload = json.loads(self.rfile.read(length) or b"{}")
+                self.send_json(200, tuya_names.refresh(HA_CONFIG, DATA_DIR, load_controls(), force=bool(payload.get("force"))))
+            except (ValueError, TypeError):
+                self.send_json(400, {"error": "Pedido invalido."})
+            return
         if self.path != "/api/controls":
             self.send_error(404)
             return
