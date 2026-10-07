@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2
+
+- Desenha spots embutidos junto aos degraus da entrada, com aro escuro e luz quente.
+- Os spots acompanham o estado de Luz da Escada e acionam o mesmo canal ao clicar.
+- O cabo do canal Luz da Escada termina na primeira lampada da sequencia.
+
 ## 0.1.5
 
 - Declara `init: false`, exigido pela base s6 v3 do Home Assistant.
