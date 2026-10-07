@@ -150,6 +150,8 @@ HTML = r"""<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Casa 3D</title>
   <script src="assets/lucide.min.js"></script>
+  <script src="assets/chart.umd.js"></script>
+  <script src="assets/marked.umd.js"></script>
   <style>
     :root {
       color-scheme: light;
@@ -590,6 +592,20 @@ HTML = r"""<!doctype html>
     body.electrical-page #electrical { display: grid; }
     body.electrical-page .stage { display: none; }
     .ha-section { display: grid; align-content: start; gap: 12px; min-width: 0; }
+    .live-card { border-bottom: 1px solid var(--line); padding: 8px 0 16px; min-width: 0; }
+    .live-card h2 { font-size: 16px; margin: 0 0 12px; }
+    .live-card h3 { font-size: 13px; margin: 16px 0 4px; }
+    .entity-row { display: flex; width: 100%; justify-content: space-between; gap: 12px; border: 0; border-radius: 0; padding: 8px 0; background: transparent; text-align: left; }
+    .entity-row span { overflow-wrap: anywhere; }
+    .entity-row strong { white-space: nowrap; }
+    .chart-box { height: 220px; }
+    .table-scroll { overflow: auto; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid var(--line); }
+    .live-element { position: absolute; min-height: 0; border: 0; padding: 0; }
+    .live-element svg, .marker svg { width: 22px; height: 22px; fill: currentColor; stroke: none; display: block; }
+    .live-element img { width: 100%; height: auto; }
+    .marker.on { background: #efc532; color: #242424; }
     #connection { color: #a34b16; font-size: 12px; }
     @media (max-width: 700px) {
       header h1, #status { display: none; }
@@ -671,8 +687,9 @@ HTML = r"""<!doctype html>
     let dragging = null;
     let editing = false;
     let dashboard = {views: []};
-    let helpers;
+    let icons = {};
     let haCards = [];
+    let charts = [];
     let haLayerKey = '';
     const layers = {devices: true, zigbee: false, electric: false};
     const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -695,13 +712,107 @@ HTML = r"""<!doctype html>
       catch { document.getElementById('connection').textContent = 'Nao foi possivel acionar o dispositivo.'; }
     }
 
+    function iconHtml(name) {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[name] || icons['mdi:lightbulb'] || ''}"></path></svg>`;
+    }
+
+    function entityValue(entity) {
+      const state = hass()?.states[entity];
+      return state ? `${state.state} ${state.attributes.unit_of_measurement || ''}`.trim() : 'Indisponivel';
+    }
+
+    function mountElements(elements, target) {
+      for (const config of elements) {
+        if (config.type === 'conditional') {
+          const group = document.createElement('div');
+          target.appendChild(group);
+          const update = () => { group.style.display = (config.conditions || []).every(condition => {
+            const state = hass()?.states[condition.entity]?.state;
+            return condition.state !== undefined ? state === condition.state : state !== condition.state_not;
+          }) ? 'contents' : 'none'; };
+          haCards.push(update);
+          update();
+          mountElements(config.elements || [], group);
+          continue;
+        }
+        const node = document.createElement(config.tap_action?.action === 'none' || !config.entity ? 'div' : 'button');
+        node.className = 'live-element';
+        for (const [key, value] of Object.entries(config.style || {})) node.style.setProperty(key, value);
+        node.title = config.title || config.entity || '';
+        if (node.tagName === 'BUTTON') {
+          node.type = 'button';
+          node.setAttribute('aria-label', node.title);
+          node.addEventListener('click', () => config.tap_action?.action === 'toggle' ? toggleEntity(config.entity) : moreInfo(config.entity));
+        }
+        if (config.type === 'image') {
+          const image = document.createElement('img');
+          image.src = config.image;
+          image.alt = config.title || '';
+          node.appendChild(image);
+        } else if (config.type === 'state-label') {
+          const update = () => { node.textContent = `${config.prefix || ''}${entityValue(config.entity)}${config.suffix || ''}`; };
+          haCards.push(update);
+          update();
+        } else if (config.style?.color !== 'transparent') {
+          node.innerHTML = iconHtml(config.icon);
+          if (config.state_color) {
+            const update = () => { node.style.color = hass()?.states[config.entity]?.state === 'on' ? '#efc532' : (config.style?.color || '#65a8cd'); };
+            haCards.push(update);
+            update();
+          }
+        }
+        target.appendChild(node);
+      }
+    }
+
     async function mountCard(config, target) {
-      if (!helpers || !hass()) return;
-      const card = helpers.createCardElement(config);
-      card.hass = hass();
-      card.addEventListener('hass-more-info', event => { event.stopPropagation(); moreInfo(event.detail.entityId); });
+      const card = document.createElement('section');
+      card.className = 'live-card';
       target.appendChild(card);
-      haCards.push(card);
+      const heading = document.createElement('h2');
+      heading.textContent = config.title || config.heading || '';
+      card.appendChild(heading);
+      if (config.type === 'entities') {
+        for (const entry of config.entities || []) {
+          if (entry.type === 'section') {
+            const title = document.createElement('h3'); title.textContent = entry.label; card.appendChild(title); continue;
+          }
+          const entity = typeof entry === 'string' ? entry : entry.entity;
+          const row = document.createElement('button');
+          row.className = 'entity-row';
+          const title = document.createElement('span');
+          title.textContent = entry.name || hass()?.states[entity]?.attributes.friendly_name || entity;
+          const value = document.createElement('strong');
+          const update = () => { value.textContent = entityValue(entity); };
+          update(); haCards.push(update);
+          row.append(title, value);
+          row.addEventListener('click', () => moreInfo(entity));
+          card.appendChild(row);
+        }
+      } else if (config.type === 'markdown') {
+        const parsed = new DOMParser().parseFromString(marked.parse(config.content || ''), 'text/html');
+        const table = document.createElement('table');
+        for (const sourceRow of parsed.querySelectorAll('tr')) {
+          const row = document.createElement('tr');
+          for (const sourceCell of sourceRow.children) { const cell = document.createElement(sourceCell.tagName === 'TH' ? 'th' : 'td'); cell.textContent = sourceCell.textContent; row.appendChild(cell); }
+          table.appendChild(row);
+        }
+        const scroll = document.createElement('div'); scroll.className = 'table-scroll'; scroll.appendChild(table); card.appendChild(scroll);
+      } else if (config.type === 'history-graph') {
+        const box = document.createElement('div'); box.className = 'chart-box';
+        const canvas = document.createElement('canvas'); box.appendChild(canvas); card.appendChild(box);
+        const ha = hass();
+        if (!ha) { box.textContent = 'Historico disponivel no Home Assistant'; return; }
+        const entries = config.entities.map(entry => typeof entry === 'string' ? {entity: entry, name: entry} : entry);
+        try {
+          const start = new Date(Date.now() - (config.hours_to_show || 3) * 3600000).toISOString();
+          const history = await ha.callApi('GET', `history/period/${start}?filter_entity_id=${encodeURIComponent(entries.map(e => e.entity).join(','))}`);
+          if (!canvas.isConnected) return;
+          const colors = ['#0c8cab', '#c16232', '#479651'];
+          const chart = new Chart(canvas, {type:'line', data:{datasets:entries.map((entry, index) => ({label:entry.name, borderColor:colors[index % colors.length], borderWidth:1.5, pointRadius:0, data:(history.find(series => series[0]?.entity_id === entry.entity) || []).filter(s => Number.isFinite(Number(s.state))).map(s => ({x:Date.parse(s.last_changed), y:Number(s.state)}))}))}, options:{responsive:true, maintainAspectRatio:false, animation:false, scales:{x:{type:'linear', ticks:{callback:value => new Date(value).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}), maxTicksLimit:5}}, y:{beginAtZero:true}}}});
+          charts.push(chart);
+        } catch { box.textContent = 'Nao foi possivel carregar o historico.'; }
+      }
     }
 
     function renderHaLayers() {
@@ -712,6 +823,8 @@ HTML = r"""<!doctype html>
       const electrical = document.getElementById('electrical');
       target.replaceChildren();
       electrical.replaceChildren();
+      charts.forEach(chart => chart.destroy());
+      charts = [];
       haCards = [];
       document.body.classList.toggle('electrical-page', floor() === 'eletrica');
       const view = dashboard.views.find(v => v.path === floor());
@@ -734,7 +847,7 @@ HTML = r"""<!doctype html>
         if (condition.entity.endsWith('dispositivos')) return false;
         return condition.entity.endsWith('zigbee') ? layers.zigbee : layers.electric;
       }).flatMap(element => element.conditions?.some(c => c.entity?.startsWith('input_boolean.casa3d_mostrar_')) ? element.elements : [element]);
-      mountCard({...source, elements}, target);
+      mountElements(elements, target);
     }
 
     const normalizeDevice = (entity) => entity
@@ -971,12 +1084,7 @@ HTML = r"""<!doctype html>
               .join('');
         } else {
           marker.innerHTML = item.kind === 'device' ? '<span class="device-symbol"></span>' : '<span>L</span>';
-          if (item.kind === 'load' && helpers) {
-            const icon = window.parent.document.createElement('ha-icon');
-            icon.setAttribute('icon', item.icon || 'mdi:lightbulb');
-            icon.style.cssText = 'width:20px;height:20px;--mdc-icon-size:20px;pointer-events:none';
-            marker.replaceChildren(icon);
-          }
+          if (item.kind === 'load') marker.innerHTML = iconHtml(item.icon || 'mdi:lightbulb');
         }
         if (selected && markerId(selected) === markerId(item)) marker.classList.add('selected');
         marker.addEventListener('pointerdown', event => {
@@ -1118,10 +1226,8 @@ HTML = r"""<!doctype html>
       data = payload.controls;
       images = payload.images;
       dashboard = payload.dashboard;
-      try {
-        helpers = await window.parent.loadCardHelpers?.();
-      } catch {}
-      if (!helpers) document.getElementById('connection').textContent = 'As visoes ao vivo ficam disponiveis dentro do Home Assistant.';
+      icons = await (await fetch('assets/mdi-icons.json')).json();
+      if (!hass()) document.getElementById('connection').textContent = 'As visoes ao vivo ficam disponiveis dentro do Home Assistant.';
       Object.keys(images).forEach(name => {
         const option = document.createElement('option');
         option.value = name;
@@ -1134,7 +1240,13 @@ HTML = r"""<!doctype html>
       floorSelect.appendChild(option);
       status.textContent = 'Pronto';
       render();
-      setInterval(() => { const ha = hass(); if (ha) haCards.forEach(card => { card.hass = ha; }); }, 1000);
+      setInterval(() => {
+        haCards.forEach(update => update());
+        stage.querySelectorAll('.marker.load').forEach(marker => {
+          const item = itemsForFloor().find(item => markerId(item) === marker.dataset.id);
+          marker.classList.toggle('on', hass()?.states[item?.entity]?.state === 'on');
+        });
+      }, 1000);
     }
 
     boot();
