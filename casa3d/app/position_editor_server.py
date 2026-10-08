@@ -780,6 +780,10 @@ HTML = r"""<!doctype html>
     .circuit-devices { display: block; font-size: 11px; color: var(--muted); }
     .panel-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
     .panel-meta { padding: 0 16px; font-size: 12px; color: var(--muted); }
+    .panel-heading { position: sticky; top: 0; background: white; z-index: 2; }
+    .panel-actions { position: sticky; bottom: 0; background: white; }
+    .panels-overview { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 16px; }
+    .panels-overview .entity-row { width: auto; font-size: 13px; }
     header { height: auto; min-height: 44px; flex-wrap: wrap; }
     .toolbar { flex-wrap: wrap; }
     main { height: calc(100dvh - var(--header-height, 44px)); }
@@ -1054,7 +1058,7 @@ HTML = r"""<!doctype html>
       const view = dashboard.views.find(v => v.path === floor());
       if (!view) return;
       if (floor() === 'eletrica') {
-        const overview = document.createElement('div'); overview.className = 'ha-section';
+        const overview = document.createElement('div'); overview.className = 'panels-overview';
         for (const [id, panel] of Object.entries(data.infrastructure.panels)) {
           const button = document.createElement('button'); button.className = 'entity-row';
           button.textContent = panel.title + ' · Deposito'; button.addEventListener('click', () => openPanel(id)); overview.appendChild(button);
