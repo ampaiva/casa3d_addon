@@ -105,7 +105,21 @@ def load_controls():
     if not CONTROLS.exists():
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         CONTROLS.write_bytes((ROOT / "casa3d-controls.json").read_bytes())
-    return ensure_device_positions(json.loads(CONTROLS.read_text()))
+    return ensure_infrastructure(ensure_device_positions(json.loads(CONTROLS.read_text())))
+
+
+def ensure_infrastructure(data):
+    infrastructure = data.setdefault("infrastructure", {})
+    panels = infrastructure.setdefault("panels", {})
+    infrastructure.setdefault("feeds", {})
+    positions = data.get("device_positions", {}).get("terreo", {})
+    depot = next((point for key, point in positions.items() if "deposito" in key), {"left": "90%", "top": "65%"})
+    for key, start, end, offset in (("quadro-01-21", 1, 21, -2), ("quadro-22-36", 22, 36, 2)):
+        panels.setdefault(key, {"title": "Quadro %02d-%02d" % (start, end), "floor": "terreo",
+            "left": pct_text(pct(depot["left"]) + offset), "top": pct_text(pct(depot["top"]) + 3),
+            "image": key + ".png", "location": "Deposito (posicao aproximada)",
+            "circuits": [{"number": number, "name": "", "phase": "", "entity": ""} for number in range(start, end + 1)]})
+    return data
 
 
 def dashboard_config():
@@ -225,6 +239,7 @@ def floor_images():
 
 def save_controls(data):
     ensure_device_positions(data)
+    ensure_infrastructure(data)
     CONTROLS.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 
 
@@ -740,6 +755,42 @@ HTML = r"""<!doctype html>
     .mesh { z-index: 1; }
     .mesh line { stroke-width: 1.5; }
     #connection { color: #a34b16; font-size: 12px; }
+    .marker.panel { width: 32px; height: 40px; min-width: 0; padding: 2px; border-radius: 4px; background: white; }
+    .marker.panel img { width: 100%; height: 100%; object-fit: contain; }
+    .marker.signal-good { outline: 3px solid #278152; }
+    .marker.signal-fair { outline: 3px solid #d4a21e; }
+    .marker.signal-poor { outline: 3px solid #c64450; }
+    .marker.signal-unknown { outline: 2px dashed #858c90; }
+    #signalLegend { display: none; position: sticky; bottom: 0; padding: 6px 10px; background: #fffffff0; gap: 14px; flex-wrap: wrap; font-size: 11px; z-index: 10; }
+    #signalLegend span { display: inline-flex; gap: 5px; align-items: center; }
+    #signalLegend b { width: 8px; height: 8px; border-radius: 50%; }
+    #feedFields { display: none; gap: 6px; margin-top: 10px; font-size: 12px; }
+    #feedFields label { display: grid; gap: 4px; }
+    #feedFields select { width: 100%; min-width: 0; padding: 5px; font-size: 12px; }
+    dialog { border: 1px solid var(--line); border-radius: 6px; padding: 0; width: min(1000px, 96vw); max-height: 92dvh; color: var(--text); }
+    dialog::backdrop { background: #1118; }
+    .panel-heading { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+    .panel-heading h2 { margin: 0; font-size: 17px; flex: 1; }
+    .panel-content { display: grid; grid-template-columns: minmax(200px, 36%) minmax(0, 1fr); gap: 16px; padding: 16px; }
+    #panelPhoto { width: 100%; max-height: 68dvh; object-fit: contain; }
+    #panelDialog table { min-width: 450px; }
+    #panelDialog input, #panelDialog select { width: 100%; font-size: 12px; padding: 5px; min-height: 30px; }
+    #panelDialog th, #panelDialog td { padding: 6px 4px; }
+    #panelDialog td:first-child { width: 32px; }
+    .circuit-devices { display: block; font-size: 11px; color: var(--muted); }
+    .panel-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
+    .panel-meta { padding: 0 16px; font-size: 12px; color: var(--muted); }
+    header { height: auto; min-height: 44px; flex-wrap: wrap; }
+    .toolbar { flex-wrap: wrap; }
+    main { height: calc(100dvh - var(--header-height, 44px)); }
+    @media (max-width: 700px) {
+      .icon-button { width: 30px; height: 30px; min-height: 30px; padding: 5px; }
+      .layer-tools { gap: 2px; padding-left: 3px; }
+      .panel-content { grid-template-columns: 1fr; }
+      #panelPhoto { max-height: 35dvh; }
+      .panel-heading { padding: 8px; }
+      .panel-actions { flex-wrap: wrap; }
+    }
     @media (max-width: 700px) {
       header h1, #status { display: none; }
       header { justify-content: center; }
@@ -759,14 +810,12 @@ HTML = r"""<!doctype html>
       <select id="floor" aria-label="Visao"></select>
       <div class="layer-tools" aria-label="Camadas">
         <button class="icon-button" id="devicesLayer" title="Dispositivos" aria-label="Dispositivos" aria-pressed="true"><i data-lucide="circuit-board"></i></button>
+        <button class="icon-button" id="loadsLayer" title="Lampadas e cargas" aria-label="Lampadas e cargas" aria-pressed="false"><i data-lucide="lightbulb"></i></button>
+        <button class="icon-button" id="panelsLayer" title="Quadros" aria-label="Quadros" aria-pressed="false"><i data-lucide="panels-top-left"></i></button>
         <button class="icon-button" id="zigbeeLayer" title="Rede Zigbee" aria-label="Rede Zigbee" aria-pressed="false"><i data-lucide="network"></i></button>
+        <button class="icon-button" id="signalLayer" title="Sinal Zigbee" aria-label="Sinal Zigbee" aria-pressed="false"><i data-lucide="radio"></i></button>
         <button class="icon-button" id="electricLayer" title="Mapa eletrico" aria-label="Mapa eletrico" aria-pressed="false"><i data-lucide="utility-pole"></i></button>
       </div>
-      <select id="mode" class="edit-only" aria-label="Pontos">
-        <option value="all">Dispositivos e cargas</option>
-        <option value="device">Dispositivos fisicos</option>
-        <option value="load">Lampadas e cargas</option>
-      </select>
       <button id="edit" class="icon-button" title="Editar posicoes" aria-label="Editar posicoes" aria-pressed="false"><i data-lucide="square-pen"></i></button>
       <button id="refreshNames" class="icon-button" title="Atualizar nomes Tuya" aria-label="Atualizar nomes Tuya"><i data-lucide="refresh-cw"></i></button>
       <button id="save" class="primary edit-only">Salvar</button>
@@ -782,6 +831,7 @@ HTML = r"""<!doctype html>
         <svg id="wires" class="wire"></svg>
       </div>
       <div id="electrical"></div>
+      <div id="signalLegend"><span><b style="background:#278152"></b>Bom</span><span><b style="background:#d4a21e"></b>Intermediario</span><span><b style="background:#c64450"></b>Fraco</span><span><b style="background:#858c90"></b>Sem leitura</span></div>
       <div id="connection" role="status"></div>
     </section>
     <aside>
@@ -800,16 +850,22 @@ HTML = r"""<!doctype html>
             <input id="topField" inputmode="decimal" disabled>
           </label>
         </div>
+        <div id="feedFields"><label>Quadro<select id="feedPanel"></select></label><label>Circuito<select id="feedCircuit"></select></label><label>Fase<select id="feedPhase"></select></label></div>
       </div>
       <div id="list" class="list"></div>
     </aside>
   </main>
+  <dialog id="panelDialog" aria-labelledby="panelTitle">
+    <div class="panel-heading"><h2 id="panelTitle"></h2><button id="panelEdit" class="icon-button" title="Editar circuitos" aria-label="Editar circuitos"><i data-lucide="square-pen"></i></button><button id="panelClose" class="icon-button" title="Fechar quadro" aria-label="Fechar quadro"><i data-lucide="x"></i></button></div>
+    <p id="panelLocation" class="panel-meta"></p>
+    <div class="panel-content"><img id="panelPhoto" alt=""><div class="table-scroll"><table><thead><tr><th>N.</th><th>Circuito / dispositivos</th><th>Fase</th><th>Leitura HA</th></tr></thead><tbody id="panelCircuits"></tbody></table></div></div>
+    <div class="panel-actions"><span id="panelStatus" role="status"></span><button id="panelCancel">Cancelar</button><button id="panelSave" class="primary">Salvar</button></div>
+  </dialog>
   <script>
     const stage = document.getElementById('stage');
     const map = document.getElementById('map');
     const wires = document.getElementById('wires');
     const floorSelect = document.getElementById('floor');
-    const modeSelect = document.getElementById('mode');
     const list = document.getElementById('list');
     const status = document.getElementById('status');
     const selectedTitle = document.getElementById('selectedTitle');
@@ -828,7 +884,7 @@ HTML = r"""<!doctype html>
     let haCards = [];
     let charts = [];
     let haLayerKey = '';
-    const layers = {devices: true, zigbee: false, electric: false};
+    const layers = {devices: true, loads: false, panels: false, zigbee: false, signal: false, electric: false};
     const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
     function hass() {
@@ -864,6 +920,7 @@ HTML = r"""<!doctype html>
 
     function renderFixtures() {
       stage.querySelectorAll('.floor-fixture').forEach(node => node.remove());
+      if (!layers.loads || floor() === 'eletrica') return;
       for (const fixture of fixtures[floor()] || []) {
         if (fixture.type !== 'recessed-ground-spot') continue;
         for (const [index, point] of fixture.points.entries()) {
@@ -876,7 +933,7 @@ HTML = r"""<!doctype html>
           node.title = `${fixture.title} - spot ${index + 1}`;
           node.setAttribute('aria-label', node.title);
           node.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#262b28" stroke="#969d98" stroke-width="1.2"/><circle cx="12" cy="12" r="8.5" fill="#101612"/><circle class="spot-lens" cx="12" cy="12" r="5.8"/><path d="M7 4.6A9 9 0 0 1 17 4.6" fill="none" stroke="#d8ded8" stroke-width="1"/><circle cx="3.7" cy="12" r=".65" fill="#bac1bc"/><circle cx="20.3" cy="12" r=".65" fill="#bac1bc"/></svg>';
-          node.addEventListener('click', () => toggleEntity(fixture.entity));
+          node.addEventListener('click', () => { if (!editing) toggleEntity(fixture.entity); });
           stage.appendChild(node);
         }
       }
@@ -997,6 +1054,12 @@ HTML = r"""<!doctype html>
       const view = dashboard.views.find(v => v.path === floor());
       if (!view) return;
       if (floor() === 'eletrica') {
+        const overview = document.createElement('div'); overview.className = 'ha-section';
+        for (const [id, panel] of Object.entries(data.infrastructure.panels)) {
+          const button = document.createElement('button'); button.className = 'entity-row';
+          button.textContent = panel.title + ' · Deposito'; button.addEventListener('click', () => openPanel(id)); overview.appendChild(button);
+        }
+        electrical.appendChild(overview);
         for (const section of view.sections || []) {
           const column = document.createElement('div');
           column.className = 'ha-section';
@@ -1010,7 +1073,7 @@ HTML = r"""<!doctype html>
       const elements = (source.elements || []).filter(element => {
         if (element.entity?.startsWith('input_boolean.casa3d_mostrar_')) return false;
         const condition = element.conditions?.find(c => c.entity?.startsWith('input_boolean.casa3d_mostrar_'));
-        if (!condition) return true;
+        if (!condition) return layers.electric;
         if (condition.entity.endsWith('dispositivos')) return false;
         return condition.entity.endsWith('zigbee') ? false : layers.electric;
       }).flatMap(element => element.conditions?.some(c => c.entity?.startsWith('input_boolean.casa3d_mostrar_')) ? element.elements : [element]);
@@ -1028,6 +1091,86 @@ HTML = r"""<!doctype html>
     const fmtPct = (value) => `${Math.max(0, Math.min(100, value)).toFixed(2)}%`;
     let channelNames = {};
     const controlTitle = control => channelNames[control.entity] || control.title || control.entity;
+    const phases = ['', 'L1', 'L2', 'L3', 'L1+L2', 'L1+L3', 'L2+L3', 'L1+L2+L3'];
+    const phaseColors = {'L1':'#b94753', 'L2':'#278152', 'L3':'#8959ac'};
+    let panelId = null, panelDraft = null, panelEditing = false;
+
+    function options(select, entries, value) {
+      select.replaceChildren();
+      entries.forEach(([key, label]) => { const option = document.createElement('option'); option.value = key; option.textContent = label; select.appendChild(option); });
+      select.value = value || '';
+    }
+
+    function renderFeedFields() {
+      const fields = document.getElementById('feedFields');
+      fields.style.display = editing && selected?.kind === 'device' && !selected.key.startsWith('zigbee:') ? 'grid' : 'none';
+      if (fields.style.display === 'none') return;
+      const feed = data.infrastructure.feeds[selected.key] || {};
+      options(document.getElementById('feedPanel'), [['','Nao cadastrado'], ...Object.entries(data.infrastructure.panels).map(([id,p]) => [id,p.title])], feed.panel);
+      const panel = data.infrastructure.panels[feed.panel];
+      options(document.getElementById('feedCircuit'), [['','Nao cadastrado'], ...(panel?.circuits || []).map(c => [String(c.number), `${c.number} · ${c.name || 'Sem nome'}`])], String(feed.circuit || ''));
+      options(document.getElementById('feedPhase'), phases.map(p => [p, p || 'Fase do circuito / nao cadastrada']), feed.phase);
+    }
+    for (const id of ['feedPanel','feedCircuit','feedPhase']) {
+      document.getElementById(id).addEventListener('change', () => {
+        if (!selected || selected.kind !== 'device') return;
+        data.infrastructure.feeds[selected.key] = {
+          panel: document.getElementById('feedPanel').value,
+          circuit: id === 'feedPanel' ? '' : document.getElementById('feedCircuit').value,
+          phase: document.getElementById('feedPhase').value
+        };
+        status.textContent = 'Alteracoes nao salvas'; renderFeedFields(); renderWires(itemsForFloor());
+      });
+    }
+
+    function openPanel(id) {
+      panelId = id; panelDraft = structuredClone(data.infrastructure.panels[id]); panelEditing = false;
+      document.getElementById('panelStatus').textContent = '';
+      renderPanel(); document.getElementById('panelDialog').showModal();
+    }
+    function renderPanel() {
+      document.getElementById('panelTitle').textContent = panelDraft.title;
+      document.getElementById('panelLocation').textContent = panelDraft.location;
+      document.getElementById('panelPhoto').src = 'assets/' + panelDraft.image;
+      document.getElementById('panelPhoto').alt = panelDraft.title + ' · Deposito';
+      const tbody = document.getElementById('panelCircuits'); tbody.replaceChildren();
+      const entityChoices = [['','Sem leitura HA'], ...Object.entries(hass()?.states || {}).filter(([id]) => id.startsWith('sensor.')).map(([id,s]) => [id, s.attributes.friendly_name || id])];
+      for (const circuit of panelDraft.circuits) {
+        const row = document.createElement('tr');
+        const number = document.createElement('td'); number.textContent = circuit.number;
+        const name = document.createElement('td');
+        const phase = document.createElement('td'); const reading = document.createElement('td');
+        if (panelEditing) {
+          const input = document.createElement('input'); input.value = circuit.name; input.setAttribute('aria-label', 'Nome do circuito ' + circuit.number);
+          input.addEventListener('input', () => circuit.name = input.value); name.appendChild(input);
+          const choice = document.createElement('select'); choice.setAttribute('aria-label', 'Fase do circuito ' + circuit.number);
+          options(choice, phases.map(p => [p,p || 'Nao cadastrada']), circuit.phase); choice.addEventListener('change', () => circuit.phase = choice.value); phase.appendChild(choice);
+          const sensor = document.createElement('select'); sensor.setAttribute('aria-label', 'Leitura do circuito ' + circuit.number);
+          options(sensor, entityChoices, circuit.entity); sensor.addEventListener('change', () => circuit.entity = sensor.value); reading.appendChild(sensor);
+        } else {
+          name.textContent = circuit.name || 'Nao cadastrado'; phase.textContent = circuit.phase || 'Nao cadastrada';
+          reading.textContent = circuit.entity ? entityValue(circuit.entity) : 'Sem leitura'; reading.dataset.entity = circuit.entity || '';
+        }
+        const assigned = Object.entries(data.infrastructure.feeds).filter(([,f]) => f.panel === panelId && String(f.circuit) === String(circuit.number)).map(([key]) => {
+          return Object.values(data.device_positions).map(points => points[key]?.title).find(Boolean) || key;
+        });
+        if (assigned.length) { const labels = document.createElement('span'); labels.className = 'circuit-devices'; labels.textContent = assigned.join(', '); name.appendChild(labels); }
+        row.append(number, name, phase, reading); tbody.appendChild(row);
+      }
+      document.getElementById('panelCancel').hidden = !panelEditing;
+      document.getElementById('panelSave').hidden = !panelEditing;
+      document.getElementById('panelEdit').setAttribute('aria-pressed', String(panelEditing));
+    }
+    document.getElementById('panelEdit').addEventListener('click', () => { panelEditing = !panelEditing; renderPanel(); });
+    document.getElementById('panelClose').addEventListener('click', () => document.getElementById('panelDialog').close());
+    document.getElementById('panelCancel').addEventListener('click', () => { panelDraft = structuredClone(data.infrastructure.panels[panelId]); panelEditing = false; renderPanel(); });
+    function applyPanel() { data.infrastructure.panels[panelId] = structuredClone(panelDraft); status.textContent = 'Alteracoes nao salvas'; render(); }
+    document.getElementById('panelSave').addEventListener('click', async () => {
+      applyPanel(); const button = document.getElementById('panelSave'); button.disabled = true;
+      try { await persistControls(); panelEditing = false; renderPanel(); document.getElementById('panelStatus').textContent = 'Salvo'; }
+      catch { document.getElementById('panelStatus').textContent = 'Erro ao salvar'; }
+      finally { button.disabled = false; }
+    });
 
     async function refreshNames(force = false) {
       const button = document.getElementById('refreshNames');
@@ -1058,17 +1201,13 @@ HTML = r"""<!doctype html>
       return floorSelect.value;
     }
 
-    function mode() {
-      return modeSelect.value;
-    }
-
     function itemsForFloor() {
       const currentFloor = floor();
       const controls = data[currentFloor] || [];
       const devices = data.device_positions?.[currentFloor] || {};
       const items = [];
 
-      if (layers.devices && mode() !== 'device') {
+      if (layers.loads) {
         controls.forEach((control, index) => {
           const key = normalizeDevice(control.entity || '');
           items.push({
@@ -1085,7 +1224,7 @@ HTML = r"""<!doctype html>
         });
       }
 
-      if ((layers.devices && mode() !== 'load') || layers.zigbee) {
+      if (layers.devices || layers.zigbee || layers.signal) {
         const channelsByDevice = controls.reduce((acc, control) => {
           const key = normalizeDevice(control.entity || '');
           const channel = channelNumber(control.entity);
@@ -1104,7 +1243,8 @@ HTML = r"""<!doctype html>
         }, {});
         Object.entries(devices).forEach(([key, point]) => {
           const network = zigbee[currentFloor]?.nodes[key];
-          if (!layers.devices && !network?.is_zigbee) return;
+          const hub = key.startsWith('zigbee:');
+          if (hub ? !layers.zigbee && !layers.signal : !layers.devices && !((layers.zigbee || layers.signal) && network?.is_zigbee)) return;
           const channels = Array.from(channelsByDevice[key] || [1]).sort((a, b) => a - b);
           const isSwitchDevice = key.startsWith('switch.');
           const isBreakerDevice = key === 'switch.tz3000_cayepv1a_ts011f';
@@ -1123,6 +1263,10 @@ HTML = r"""<!doctype html>
         });
       }
 
+      if (layers.panels) for (const [key, panel] of Object.entries(data.infrastructure.panels)) {
+        if (panel.floor === currentFloor) items.push({kind:'panel', key, title:panel.title, left:panel.left, top:panel.top, image:panel.image, entity:''});
+      }
+
       return items;
     }
 
@@ -1133,6 +1277,9 @@ HTML = r"""<!doctype html>
         control.top = fmtPct(top);
         item.left = control.left;
         item.top = control.top;
+      } else if (item.kind === 'panel') {
+        const panel = data.infrastructure.panels[item.key]; panel.left = fmtPct(left); panel.top = fmtPct(top);
+        panel.location = 'Deposito'; item.left = panel.left; item.top = panel.top;
       } else {
         const point = data.device_positions[floor()][item.key];
         point.left = fmtPct(left);
@@ -1154,7 +1301,7 @@ HTML = r"""<!doctype html>
     function selectItem(item) {
       selected = item;
       selectedTitle.textContent = item.title;
-      selectedMeta.textContent = item.kind === 'device'
+      selectedMeta.textContent = item.kind === 'panel' ? 'Quadro eletrico · Deposito' : item.kind === 'device'
         ? `${item.model || 'Modulo Zigbee'} fisico${item.channels && item.channels.length > 1 ? ` · ${item.channels.length} canais` : ''}: ${item.entity}`
         : `Canal ${item.channel} alimenta: ${item.entity}`;
       leftField.disabled = false;
@@ -1162,6 +1309,7 @@ HTML = r"""<!doctype html>
       leftField.value = parsePct(item.left).toFixed(2);
       topField.value = parsePct(item.top).toFixed(2);
       render();
+      renderFeedFields();
     }
 
     function updateSelectedFromFields() {
@@ -1204,16 +1352,16 @@ HTML = r"""<!doctype html>
       const width = stage.clientWidth;
       const height = stage.clientHeight;
       wires.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      if (!layers.devices || floor() === 'eletrica' || mode() === 'load') return;
+      if (floor() === 'eletrica') return;
       const devices = new Map(items.filter(item => item.kind === 'device').map(item => [item.key, item]));
-      const loads = (data[floor()] || []).map((control, index) => ({
+      const loads = layers.devices && layers.loads ? (data[floor()] || []).map((control, index) => ({
         entity: control.entity,
         key: normalizeDevice(control.entity || ''),
         channel: channelNumber(control.entity),
         left: control.left,
         top: control.top,
         index
-      }));
+      })) : [];
       loads.forEach(load => {
         const device = devices.get(load.key);
         if (!device) return;
@@ -1228,6 +1376,21 @@ HTML = r"""<!doctype html>
         line.setAttribute('y2', parsePct(endpoint.top) * height / 100);
         wires.appendChild(line);
       });
+      if (layers.panels && layers.devices && layers.electric) {
+        for (const [key, feed] of Object.entries(data.infrastructure.feeds)) {
+          const device = devices.get(key), panel = data.infrastructure.panels[feed.panel];
+          if (!device || !panel || panel.floor !== floor()) continue;
+          const circuit = panel.circuits.find(c => String(c.number) === String(feed.circuit));
+          const phase = feed.phase || circuit?.phase || '';
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line'); line.classList.add('feed-wire');
+          line.style.stroke = phaseColors[phase] || '#657076'; line.style.strokeWidth = '2';
+          const start = markerCenterPx(panel), end = markerCenterPx(device);
+          for (const [attr,value] of Object.entries({x1:start.x,y1:start.y,x2:end.x,y2:end.y})) line.setAttribute(attr,value);
+          const title = document.createElementNS('http://www.w3.org/2000/svg','title');
+          title.textContent = `${panel.title} · Circuito ${feed.circuit || 'nao cadastrado'} · ${phase || 'Fase nao cadastrada'} · ${device.title}`;
+          line.appendChild(title); wires.appendChild(line);
+        }
+      }
     }
 
     function renderMesh() {
@@ -1236,7 +1399,9 @@ HTML = r"""<!doctype html>
       if (!layers.zigbee || floor() === 'eletrica') return;
       const width = stage.clientWidth, height = stage.clientHeight;
       mesh.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      const visible = new Set(itemsForFloor().filter(i => i.kind === 'device').map(i => i.key));
       for (const link of zigbee[floor()]?.links || []) {
+        if (!visible.has(link.from) || !visible.has(link.to)) continue;
         const positions = data.device_positions[floor()];
         const start = positions[link.from], end = positions[link.to];
         if (!start || !end) continue;
@@ -1251,15 +1416,29 @@ HTML = r"""<!doctype html>
 
     function updateNetworkInfo(marker, item) {
       const network = item.network;
-      if (!layers.zigbee || !network?.is_zigbee) return;
+      if ((!layers.zigbee && !layers.signal) || !network?.is_zigbee) return;
       const values = Object.entries(network.signals).map(([kind, entity]) => {
         const state = hass()?.states[entity];
         const unit = kind === 'rssi' ? ` ${state?.attributes.unit_of_measurement || 'dBm'}` : '';
         return `${kind.toUpperCase()} ${state?.state || 'Indisponivel'}${unit}`;
       });
       const info = marker.querySelector('.network-info');
-      if (info) info.textContent = values.join(' · ') || network.network;
+      if (info) info.textContent = values.join(' · ') || 'Sem leitura';
       marker.title = `${item.title} · ${network.network}${values.length ? ' · ' + values.join(' · ') : ''}`;
+      if (layers.signal) {
+        marker.classList.remove('signal-good','signal-fair','signal-poor','signal-unknown');
+        const measurements = Object.entries(network.signals).map(([kind,entity]) => {
+          const state = hass()?.states[entity]; const value = Number(state?.state);
+          if (!state || !Number.isFinite(value) || !String(state.state).trim()) return null;
+          return {kind,value,updated:state.last_updated};
+        }).filter(Boolean);
+        const measurement = measurements.find(m => m.kind === 'lqi') || measurements.find(m => m.kind === 'rssi');
+        const quality = !measurement ? 'unknown' : measurement.kind === 'lqi'
+          ? (measurement.value >= 100 ? 'good' : measurement.value >= 50 ? 'fair' : 'poor')
+          : (measurement.value >= -70 ? 'good' : measurement.value >= -85 ? 'fair' : 'poor');
+        marker.classList.add('signal-' + quality);
+        marker.title += measurement ? ` · Leitura ${new Date(measurement.updated).toLocaleString('pt-BR')} · Classificacao indicativa (${measurement.kind.toUpperCase()})` : ' · Sem leitura de sinal';
+      }
     }
 
     function render() {
@@ -1270,7 +1449,12 @@ HTML = r"""<!doctype html>
       renderFixtures();
 
       stage.querySelectorAll('.marker').forEach(node => node.remove());
-      const items = (layers.devices || layers.zigbee) && currentFloor !== 'eletrica' ? itemsForFloor() : [];
+      document.getElementById('signalLegend').style.display = layers.signal && currentFloor !== 'eletrica' ? 'flex' : 'none';
+      const items = currentFloor !== 'eletrica' ? itemsForFloor() : [];
+      if (selected && !items.some(item => markerId(item) === markerId(selected))) {
+        selected = null; selectedTitle.textContent = 'Selecione um ponto';
+        leftField.disabled = true; topField.disabled = true; leftField.value = ''; topField.value = '';
+      }
 
       items.forEach(item => {
         const marker = document.createElement('button');
@@ -1292,7 +1476,9 @@ HTML = r"""<!doctype html>
         marker.title = isGirierImage ? `${item.model} ${channelText} · ${item.title}` : (isPhotoDevice || isModule ? `${item.model} · ${item.title}` : item.title);
         marker.setAttribute('aria-label', marker.title);
         marker.dataset.id = markerId(item);
-        if (isBreakerImage) {
+        if (item.kind === 'panel') {
+          marker.innerHTML = `<img src="assets/${escapeHtml(item.image)}" alt="">`;
+        } else if (isBreakerImage) {
           marker.innerHTML = '<img class="device-photo" src="assets/tongou-breaker-to-q-sy2-jzt.webp?v=1" alt="">';
         } else if (isGirierImage) {
           const channelItems = item.channels.map(channel => {
@@ -1316,11 +1502,11 @@ HTML = r"""<!doctype html>
           if (item.kind === 'load') marker.innerHTML = iconHtml(item.icon || 'mdi:lightbulb');
           else if (item.network?.icon && !item.entity?.startsWith('switch.')) marker.innerHTML = iconHtml(item.network.icon);
         }
-        if (layers.zigbee && item.network?.is_zigbee) {
+        if ((layers.zigbee || layers.signal) && item.network?.is_zigbee) {
           marker.style.setProperty('--network-color', item.network.network === 'Sonoff/ZHA' ? '#0c8cab' : '#c16232');
           const badge = document.createElement('span'); badge.className = 'network-badge'; badge.textContent = 'Z';
-          const info = document.createElement('span'); info.className = 'network-info';
-          marker.append(badge, info);
+          marker.append(badge);
+          if (layers.signal) { const info = document.createElement('span'); info.className = 'network-info'; marker.append(info); }
           updateNetworkInfo(marker, item);
         }
         if (selected && markerId(selected) === markerId(item)) marker.classList.add('selected');
@@ -1329,7 +1515,8 @@ HTML = r"""<!doctype html>
           if (channel && !editing) { event.preventDefault(); toggleEntity(channel.dataset.entity); return; }
           if (!editing) {
             event.preventDefault();
-            if (item.kind === 'load') toggleEntity(item.entity);
+            if (item.kind === 'panel') openPanel(item.key);
+            else if (item.kind === 'load') toggleEntity(item.entity);
             else { selected = isExpanded ? null : item; render(); }
             return;
           }
@@ -1352,6 +1539,7 @@ HTML = r"""<!doctype html>
           const channel = event.target.closest('.channel-list span');
           if (channel && !editing) toggleEntity(channel.dataset.entity);
           else if (editing) selectItem(item);
+          else if (item.kind === 'panel') openPanel(item.key);
           else if (item.kind === 'load') toggleEntity(item.entity);
           else { selected = isExpanded ? null : item; render(); }
         });
@@ -1366,10 +1554,10 @@ HTML = r"""<!doctype html>
         row.type = 'button';
         row.className = 'row';
         if (selected && markerId(selected) === markerId(item)) row.classList.add('selected');
-        const subtitle = item.kind === 'device'
+        const subtitle = item.kind === 'panel' ? 'Quadro eletrico · Deposito' : item.kind === 'device'
           ? `${item.model || 'Modulo Zigbee'}${item.channels ? ` · ${item.channels.length === 1 ? '1 canal' : `${item.channels.length} canais`}` : ''}`
           : `Canal ${item.channel} · ${item.entity}`;
-        row.innerHTML = `<strong>${item.title}</strong><span>${subtitle}</span>`;
+        row.innerHTML = `<strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(subtitle)}</span>`;
         row.addEventListener('click', () => {
           selected = selected && markerId(selected) === markerId(item) ? null : item;
           if (selected) {
@@ -1386,6 +1574,7 @@ HTML = r"""<!doctype html>
         });
         list.appendChild(row);
       });
+      renderFeedFields();
     }
 
     window.addEventListener('pointermove', event => {
@@ -1430,18 +1619,17 @@ HTML = r"""<!doctype html>
       dragging = null;
       render();
     });
-    for (const [key, id] of Object.entries({devices:'devicesLayer', zigbee:'zigbeeLayer', electric:'electricLayer'})) {
+    for (const [key, id] of Object.entries({devices:'devicesLayer', loads:'loadsLayer', panels:'panelsLayer', zigbee:'zigbeeLayer', signal:'signalLayer', electric:'electricLayer'})) {
       document.getElementById(id).addEventListener('click', () => {
         layers[key] = !layers[key];
         document.getElementById(id).setAttribute('aria-pressed', String(layers[key]));
         render();
       });
     }
-    modeSelect.addEventListener('change', () => { selected = null; render(); });
     map.addEventListener('load', () => { renderWires(itemsForFloor()); renderMesh(); });
     window.addEventListener('resize', render);
 
-    document.getElementById('save').addEventListener('click', async () => {
+    async function persistControls() {
       status.textContent = 'Salvando...';
       const response = await fetch('api/controls', {
         method: 'POST',
@@ -1450,12 +1638,14 @@ HTML = r"""<!doctype html>
       });
       if (!response.ok) {
         status.textContent = 'Erro ao salvar';
-        return;
+        throw new Error('Erro ao salvar');
       }
       data = await response.json();
       status.textContent = 'Salvo';
       render();
-    });
+    }
+    document.getElementById('save').addEventListener('click', async () => { try { await persistControls(); } catch { status.textContent = 'Erro ao salvar'; } });
+    new ResizeObserver(entries => document.documentElement.style.setProperty('--header-height', entries[0].contentRect.height + 'px')).observe(document.querySelector('header'));
 
     async function boot() {
       lucide.createIcons();
@@ -1483,6 +1673,7 @@ HTML = r"""<!doctype html>
       render();
       refreshNames();
       setInterval(() => {
+        document.querySelectorAll('#panelCircuits td[data-entity]').forEach(td => { if (td.dataset.entity) td.textContent = entityValue(td.dataset.entity); });
         updateFixtures();
         haCards.forEach(update => update());
         const items = itemsForFloor();
@@ -1548,6 +1739,9 @@ class Handler(BaseHTTPRequestHandler):
             current_asset = HA_CONFIG / "www" / "casa3d" / name
             if current_asset.is_file():
                 file_path = current_asset
+            private_asset = DATA_DIR / "assets" / name
+            if private_asset.is_file():
+                file_path = private_asset
             if not file_path.exists() or not file_path.is_file():
                 self.send_error(404)
                 return
@@ -1572,6 +1766,9 @@ class Handler(BaseHTTPRequestHandler):
             current_asset = HA_CONFIG / "www" / "casa3d" / name
             if current_asset.is_file():
                 file_path = current_asset
+            private_asset = DATA_DIR / "assets" / name
+            if private_asset.is_file():
+                file_path = private_asset
             if not file_path.exists() or not file_path.is_file():
                 self.send_error(404)
                 return
