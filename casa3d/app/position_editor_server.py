@@ -129,14 +129,49 @@ def dashboard_config():
     return {"views": []}
 
 
-def zigbee_devices(controls, dashboard):
-    storage = HA_CONFIG / ".storage"
-    def registry(name, field):
-        source = storage / name
-        return json.loads(source.read_text())["data"][field] if source.exists() else []
+def read_registry(name, field):
+    source = HA_CONFIG / ".storage" / name
+    return json.loads(source.read_text())["data"][field] if source.exists() else []
 
-    entities = {item["entity_id"]: item for item in registry("core.entity_registry", "entities")}
-    devices = {item["id"]: item for item in registry("core.device_registry", "devices")}
+
+def discover_sensors(controls):
+    devices = {item["id"]: item for item in read_registry("core.device_registry", "devices")}
+    positions = controls.setdefault("device_positions", {})
+    represented = set()
+    classes = {"door", "window", "opening", "motion", "occupancy", "moisture", "smoke", "gas"}
+    for floor_points in positions.values():
+        for key, point in floor_points.items():
+            if point.get("sensor_device_id"):
+                represented.add(point["sensor_device_id"])
+    for entry in read_registry("core.entity_registry", "entities"):
+        entity = entry["entity_id"]
+        device_id = entry.get("device_id")
+        device = devices.get(device_id, {})
+        device_class = entry.get("device_class") or entry.get("original_device_class")
+        if (not entity.startswith("binary_sensor.") or not device_id or entry.get("disabled_by")
+                or device.get("disabled_by") or device_class not in classes
+                or entry.get("platform") not in ("zha", "zigbee2mqtt", "deconz", "tuya", "localtuya")):
+            continue
+        existing = next((points[entity] for points in positions.values() if entity in points), None)
+        if existing is not None:
+            existing.update({"sensor_device_id": device_id, "device_class": device_class})
+            represented.add(device_id)
+            continue
+        if device_id in represented:
+            continue
+        # Unlocated sensors stay in a provisional strip, never at an invented room location.
+        points = positions.setdefault("terreo", {})
+        index = sum(bool(point.get("sensor_device_id")) for point in points.values())
+        points[entity] = {"title": entry.get("name") or device.get("name_by_user") or device.get("name") or entity,
+            "left": pct_text(3 + (index // 12) * 4), "top": pct_text(8 + (index % 12) * 7),
+            "sensor_device_id": device_id, "device_class": device_class, "position_pending": True}
+        represented.add(device_id)
+    return controls
+
+
+def zigbee_devices(controls, dashboard):
+    entities = {item["entity_id"]: item for item in read_registry("core.entity_registry", "entities")}
+    devices = {item["id"]: item for item in read_registry("core.device_registry", "devices")}
     signals = defaultdict(dict)
     for entity, entry in entities.items():
         for kind in ("lqi", "rssi"):
@@ -151,7 +186,8 @@ def zigbee_devices(controls, dashboard):
         positions = controls["device_positions"][floor]
         nodes = {}
         physical_ids = {}
-        for control in controls.get(floor, []):
+        sensor_controls = [{"entity": key} for key, point in positions.items() if point.get("sensor_device_id")]
+        for control in controls.get(floor, []) + sensor_controls:
             entity = control.get("entity", "")
             key = normalize_device(entity)
             if key not in positions:
@@ -168,6 +204,7 @@ def zigbee_devices(controls, dashboard):
                 "entity": entity, "network": "Sonoff/ZHA" if platform == "zha" else platform})
             if entity in signal_map:
                 node["signals"]["lqi"] = signal_map[entity]["sensor"]
+                node["is_zigbee"] = True
 
         source = next((card for card in view.get("cards", []) if card.get("type") == "picture-elements"), {})
         legacy = [child for element in source.get("elements", [])
@@ -1258,9 +1295,11 @@ HTML = r"""<!doctype html>
             title: point.title || key,
             entity: network?.entity || key,
             network,
+            deviceClass: point.device_class,
+            positionPending: point.position_pending,
             left: point.left,
             top: point.top,
-            model: isBreakerDevice ? 'Disjuntor Zigbee' : (isSwitchDevice ? 'Girier' : (point.model || (channels.length > 1 ? 'Modulo multicanal' : 'Modulo Zigbee'))),
+            model: point.device_class ? 'Sensor' : isBreakerDevice ? 'Disjuntor Zigbee' : (isSwitchDevice ? 'Girier' : (point.model || (channels.length > 1 ? 'Modulo multicanal' : 'Modulo Zigbee'))),
             channels,
             channelNames: channelNamesByDevice[key] || {}
           });
@@ -1288,6 +1327,7 @@ HTML = r"""<!doctype html>
         const point = data.device_positions[floor()][item.key];
         point.left = fmtPct(left);
         point.top = fmtPct(top);
+        delete point.position_pending;
         item.left = point.left;
         item.top = point.top;
       }
@@ -1306,7 +1346,7 @@ HTML = r"""<!doctype html>
       selected = item;
       selectedTitle.textContent = item.title;
       selectedMeta.textContent = item.kind === 'panel' ? 'Quadro eletrico · Deposito' : item.kind === 'device'
-        ? `${item.model || 'Modulo Zigbee'} fisico${item.channels && item.channels.length > 1 ? ` · ${item.channels.length} canais` : ''}: ${item.entity}`
+        ? `${item.model || 'Modulo Zigbee'} fisico${item.positionPending ? ' · Posicao a confirmar' : ''}${item.channels && item.channels.length > 1 ? ` · ${item.channels.length} canais` : ''}: ${item.entity}`
         : `Canal ${item.channel} alimenta: ${item.entity}`;
       leftField.disabled = false;
       topField.disabled = false;
@@ -1477,7 +1517,7 @@ HTML = r"""<!doctype html>
         marker.className = `marker ${item.kind}${(isModule || isPhotoDevice) ? ' module' : ''}${isModule && !isPhotoDevice ? ` generic-module channels-${item.channels.length}` : ''}${isGirierImage ? ` device-image channels-${item.channels.length}` : ''}${isBreakerImage ? ' device-image breaker-image' : ''}${isExpanded ? ' expanded' : ''}`;
         marker.style.setProperty('--x', item.left);
         marker.style.setProperty('--y', item.top);
-        marker.title = isGirierImage ? `${item.model} ${channelText} · ${item.title}` : (isPhotoDevice || isModule ? `${item.model} · ${item.title}` : item.title);
+        marker.title = (isGirierImage ? `${item.model} ${channelText} · ${item.title}` : (isPhotoDevice || isModule ? `${item.model} · ${item.title}` : item.title)) + (item.positionPending ? ' · Posicao a confirmar' : '');
         marker.setAttribute('aria-label', marker.title);
         marker.dataset.id = markerId(item);
         if (item.kind === 'panel') {
@@ -1505,6 +1545,11 @@ HTML = r"""<!doctype html>
           marker.innerHTML = item.kind === 'device' ? '<span class="device-symbol"></span>' : '<span>L</span>';
           if (item.kind === 'load') marker.innerHTML = iconHtml(item.icon || 'mdi:lightbulb');
           else if (item.network?.icon && !item.entity?.startsWith('switch.')) marker.innerHTML = iconHtml(item.network.icon);
+          if (item.deviceClass) {
+            const symbol = {door:'door-open', window:'panels-top-left', opening:'door-open', motion:'scan-eye', occupancy:'scan-eye', moisture:'droplets', smoke:'flame', gas:'wind'}[item.deviceClass];
+            marker.innerHTML = `<i data-lucide="${symbol}"></i>`;
+            marker.style.background = '#287a65';
+          }
         }
         if ((layers.zigbee || layers.signal) && item.network?.is_zigbee) {
           marker.style.setProperty('--network-color', item.network.network === 'Sonoff/ZHA' ? '#0c8cab' : '#c16232');
@@ -1521,6 +1566,7 @@ HTML = r"""<!doctype html>
             event.preventDefault();
             if (item.kind === 'panel') openPanel(item.key);
             else if (item.kind === 'load') toggleEntity(item.entity);
+            else if (!isPhotoDevice && !isModule && item.entity && !item.key.startsWith('zigbee:')) moreInfo(item.entity);
             else { selected = isExpanded ? null : item; render(); }
             return;
           }
@@ -1545,12 +1591,14 @@ HTML = r"""<!doctype html>
           else if (editing) selectItem(item);
           else if (item.kind === 'panel') openPanel(item.key);
           else if (item.kind === 'load') toggleEntity(item.entity);
+          else if (!isPhotoDevice && !isModule && item.entity && !item.key.startsWith('zigbee:')) moreInfo(item.entity);
           else { selected = isExpanded ? null : item; render(); }
         });
         stage.appendChild(marker);
       });
       renderWires(items);
       renderMesh();
+      lucide.createIcons();
 
       list.innerHTML = '';
       items.forEach(item => {
@@ -1731,6 +1779,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/controls":
             controls = load_controls()
+            discover_sensors(controls)
             dashboard = dashboard_config()
             network = zigbee_devices(controls, dashboard)
             self.send_json(200, {"controls": controls, "images": floor_images(), "dashboard": dashboard, "zigbee": network,
