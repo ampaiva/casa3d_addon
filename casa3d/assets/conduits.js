@@ -38,8 +38,9 @@ window.Casa3DConduits = (() => {
     if (!network.floors[floor]) return;
     const info = network.floors[floor];
     const floorRegistration = alignment?.floors[floor];
-    const registration = floorRegistration?.image === images?.[floor] ? floorRegistration : floorRegistration?.variants?.[images?.[floor]];
-    const canProject = registration && registration.image === images?.[floor];
+    const matchesImage = registration => registration && (registration.image === images?.[floor] || registration.image_aliases?.includes(images?.[floor]));
+    const registration = matchesImage(floorRegistration) ? floorRegistration : floorRegistration?.variants?.[images?.[floor]];
+    const canProject = matchesImage(registration);
     const use3d = state.base === '3d' && canProject;
     const projection = use3d ? window.Casa3DProjection.create(registration) : null;
     const selected = info.boxes.find(box => box.id === state.box);
