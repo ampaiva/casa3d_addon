@@ -302,6 +302,8 @@ HTML = r"""<!doctype html>
   <script src="assets/lucide.min.js"></script>
   <script src="assets/chart.umd.js"></script>
   <script src="assets/marked.umd.js"></script>
+  <script src="assets/conduits-projection.js"></script>
+  <script src="assets/conduits.js"></script>
   <style>
     :root {
       color-scheme: light;
@@ -741,6 +743,22 @@ HTML = r"""<!doctype html>
     #electrical { display: none; padding: 12px; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     body.electrical-page #electrical { display: grid; }
     body.electrical-page .stage { display: none; }
+    #conduitView[hidden] { display: none; }
+    #conduitView { padding: 0 12px; }
+    body.conduit-page .stage, body.conduit-page aside,
+    body.conduit-page #electrical, body.conduit-page .layer-tools,
+    body.conduit-page #edit, body.conduit-page #refreshNames,
+    body.conduit-page .edit-only { display: none; }
+    body.conduit-page main { grid-template-columns: minmax(0, 1fr); }
+    .conduit-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+    .conduit-tools label { display: flex; align-items: center; gap: 6px; }
+    .conduit-tools input { width: auto; }
+    .conduit-tools [aria-pressed="true"] { background: #e0f3f7; border-color: #72bacb; }
+    .conduit-note, .conduit-detail { color: #505b63; font-size: 13px; }
+    .conduit-canvas { position: relative; width: 100%; max-width: 800px; margin: 16px auto; }
+    .conduit-plan { display: block; width: 100%; margin: 0; background: #fff; }
+    .conduit-panel { position: absolute; transform: translate(-50%, -50%); width: 24px; height: 32px; min-height: 0; padding: 1px; }
+    .conduit-panel img { display: block; width: 100%; height: 100%; object-fit: contain; }
     .ha-section { display: grid; align-content: start; gap: 12px; min-width: 0; }
     .live-card { border-bottom: 1px solid var(--line); padding: 8px 0 16px; min-width: 0; }
     .live-card h2 { font-size: 16px; margin: 0 0 12px; }
@@ -856,6 +874,7 @@ HTML = r"""<!doctype html>
         <button class="icon-button" id="zigbeeLayer" title="Rede Zigbee" aria-label="Rede Zigbee" aria-pressed="false"><i data-lucide="network"></i></button>
         <button class="icon-button" id="signalLayer" title="Sinal Zigbee" aria-label="Sinal Zigbee" aria-pressed="false"><i data-lucide="radio"></i></button>
         <button class="icon-button" id="electricLayer" title="Mapa eletrico" aria-label="Mapa eletrico" aria-pressed="false"><i data-lucide="utility-pole"></i></button>
+        <button class="icon-button" id="conduitLayer" title="Eletrodutos de piso e teto" aria-label="Eletrodutos de piso e teto"><i data-lucide="route"></i></button>
       </div>
       <button id="edit" class="icon-button" title="Editar posicoes" aria-label="Editar posicoes" aria-pressed="false"><i data-lucide="square-pen"></i></button>
       <button id="refreshNames" class="icon-button" title="Atualizar nomes Tuya" aria-label="Atualizar nomes Tuya"><i data-lucide="refresh-cw"></i></button>
@@ -872,6 +891,7 @@ HTML = r"""<!doctype html>
         <svg id="wires" class="wire"></svg>
       </div>
       <div id="electrical"></div>
+      <div id="conduitView" hidden></div>
       <div id="signalLegend"><span><b style="background:#278152"></b>Bom</span><span><b style="background:#d4a21e"></b>Intermediario</span><span><b style="background:#c64450"></b>Fraco</span><span><b style="background:#858c90"></b>Sem leitura</span></div>
       <div id="connection" role="status"></div>
     </section>
@@ -1487,6 +1507,20 @@ HTML = r"""<!doctype html>
 
     function render() {
       const currentFloor = floor();
+      const conduitFloor = currentFloor.startsWith('eletrodutos-') ? currentFloor.slice('eletrodutos-'.length) : null;
+      document.body.classList.toggle('conduit-page', Boolean(conduitFloor));
+      const conduitView = document.getElementById('conduitView');
+      conduitView.hidden = !conduitFloor;
+      if (conduitFloor) {
+        document.body.classList.remove('electrical-page');
+        document.getElementById('signalLegend').style.display = 'none';
+        selected = null;
+        haLayerKey = '';
+        charts.forEach(chart => chart.destroy()); charts = [];
+        haCards = [];
+        window.Casa3DConduits.render(conduitView, conduitFloor, data.infrastructure.panels, openPanel, images);
+        return;
+      }
       map.src = `assets/${images[currentFloor]}`;
       map.alt = `Mapa ${currentFloor}`;
       renderHaLayers();
@@ -1662,6 +1696,10 @@ HTML = r"""<!doctype html>
     leftField.addEventListener('change', updateSelectedFromFields);
     topField.addEventListener('change', updateSelectedFromFields);
     floorSelect.addEventListener('change', () => { selected = null; render(); });
+    document.getElementById('conduitLayer').addEventListener('click', () => {
+      floorSelect.value = 'eletrodutos-' + (floor() === 'superior' ? 'superior' : 'terreo');
+      selected = null; render();
+    });
     document.getElementById('edit').addEventListener('click', () => {
       editing = !editing;
       document.body.classList.toggle('editing', editing);
@@ -1721,6 +1759,14 @@ HTML = r"""<!doctype html>
       option.value = 'eletrica';
       option.textContent = 'Eletrica';
       floorSelect.appendChild(option);
+      for (const [name, label] of [['terreo', 'Térreo'], ['superior', 'Superior']]) {
+        const conduitOption = document.createElement('option');
+        conduitOption.value = 'eletrodutos-' + name;
+        conduitOption.textContent = 'Eletrodutos · ' + label;
+        floorSelect.appendChild(conduitOption);
+      }
+      const initialView = new URLSearchParams(window.location.search).get('view');
+      if (Array.from(floorSelect.options).some(option => option.value === initialView)) floorSelect.value = initialView;
       status.textContent = 'Pronto';
       render();
       refreshNames();

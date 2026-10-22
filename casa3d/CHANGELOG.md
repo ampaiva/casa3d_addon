@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0
+
+- Declara a base Home Assistant/Alpine compatível com o serviço já usado na instalação.
+
+- Sobrepõe os eletrodutos do projeto à planta 3D dos dois pavimentos.
+- Separa piso pontilhado e teto/laje contínuo, com filtros independentes.
+- Identifica as caixas de passagem e destaca seus trechos ao selecionar.
+- Preserva posições e cadastro dos quadros reais no depósito.
+- Permite alternar entre a planta 3D e a referência técnica.
+- Inclui alinhamentos visuais para térreo v18/v20 e superior original; conferir na obra.
+
 ## 0.3.2
 
 - Desenha spots embutidos junto aos degraus da entrada, com aro escuro e luz quente.
