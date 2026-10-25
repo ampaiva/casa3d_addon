@@ -34,6 +34,6 @@ def install(config_dir, data_dir, client):
     for entry in entries:
         if entry['domain'] == 'tuya':
             client.call('call_service', domain='homeassistant', service='reload_config_entry',
-                        service_data={'entry_id': entry['entry_id']}, blocking=True)
+                        service_data={'entry_id': entry['entry_id']})
     status_path.write_text(json.dumps({'applied_hash': digest, 'updated_at': time.time(),
                                       'status': 'Correcao de escala do produto 16A Estimate Socket aplicada'}))

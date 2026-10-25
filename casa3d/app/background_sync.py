@@ -1,13 +1,12 @@
 """Periodic synchronization independent of the browser being open."""
 import json
 import logging
-import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
 
 from . import tuya_rooms, energy_learning, voltage_fix
-from .ha_client import HAClient
+from .ha_client import HAClient, supervisor_token
 
 _LOG = logging.getLogger(__name__)
 
@@ -89,7 +88,7 @@ def run_once(config_dir, data_dir, controls_path, options, client_factory=HAClie
 
 
 def start(config_dir, data_dir, controls_path, options_path):
-    if not os.environ.get('SUPERVISOR_TOKEN'):
+    if not supervisor_token():
         return
     def worker():
         while True:
