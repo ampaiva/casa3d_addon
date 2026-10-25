@@ -11,11 +11,12 @@ from pathlib import Path
 from urllib.parse import unquote
 
 try:
-    from . import tuya_names, locations, energy
+    from . import tuya_names, locations, energy, tuya_rooms, background_sync
 except ImportError:
     import tuya_names
     import locations
     import energy
+    from app import tuya_rooms, background_sync
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -903,6 +904,7 @@ HTML = r"""<!doctype html>
     <h2 id="locationsTitle">Andares e comodos do Home Assistant</h2>
     <p>Vincule os andares às plantas. Marque cada cômodo na imagem ou ajuste sua região em porcentagens.</p>
     <div id="floorBindings"></div>
+    <details><summary>Sincronizacao de comodos Tuya → HA</summary><p id="tuyaSyncStatus"></p><div id="tuyaRoomBindings"></div><p>Vinculos iguais e novos dispositivos sao sincronizados a cada 15 minutos. Ajustes manuais no HA sao preservados. Comodos novos sem andar ou regiao precisam ser vinculados à planta.</p></details>
     <div class="table-scroll"><table><thead><tr><th>Cômodo HA</th><th>Planta</th><th>Esquerda %</th><th>Topo %</th><th>Largura %</th><th>Altura %</th><th>Região</th></tr></thead><tbody id="roomBindings"></tbody></table></div>
     <p>Novos dispositivos aparecem no centro do cômodo. Arraste para ajustar a posição exata.</p>
     <h3>A localizar</h3><div id="unlocatedList"></div>
@@ -929,6 +931,7 @@ HTML = r"""<!doctype html>
     let data;
     let images;
     let locationRegistry = {floors: [], areas: []};
+    let roomSync = {rooms:[]};
     let dirty = false;
     let selected = null;
     let dragging = null;
@@ -1128,6 +1131,14 @@ HTML = r"""<!doctype html>
           assignment.textContent = panel ? `${panel.title} · Circuito ${feed.circuit || 'a identificar'} · ${feed.phase || panel.circuits.find(c => String(c.number) === String(feed.circuit))?.phase || 'Fase a identificar'}` : device.assignment_status;
           if (device.assignment.source) assignment.title = device.assignment.source;
           card.append(assignment);
+          if (!panel) {
+            const learning = document.createElement('p');
+            const evidence = device.learning || {};
+            learning.textContent = evidence.candidate && evidence.meter
+              ? `Alimentacao provavel: ${evidence.meter.title} · Canal ${evidence.meter.channel} · ${evidence.candidate.matches} variacoes coincidentes (${Math.round(evidence.candidate.score * 100)}%). Circuito ainda a identificar.`
+              : (evidence.status || 'Comparacao de consumo aguardando dados');
+            card.append(learning);
+          }
           for (const reading of device.readings) {
             const button = document.createElement('button'); button.className = 'entity-row';
             const update = () => { const state = hass()?.states[reading.entity]; button.textContent = `${state?.attributes.friendly_name || ({energy:'Consumo',power:'Potencia',current:'Corrente',voltage:'Tensao'}[reading.kind] || 'Leitura')}: ${entityValue(reading.entity)}`; };
@@ -1770,6 +1781,7 @@ HTML = r"""<!doctype html>
       data = payload.controls;
       images = payload.images;
       locationRegistry = payload.locations || {floors: [], areas: []};
+      roomSync = payload.tuya_room_sync || {rooms:[]};
       dashboard = payload.dashboard;
       zigbee = payload.zigbee;
       fixtures = payload.fixtures || {};
@@ -1834,7 +1846,7 @@ HTML = r"""<!doctype html>
         // Recheck after the request: the user may have started editing in the meantime.
         if (dirty || editing || drawingRoom || locationsDialog.open || document.getElementById('panelDialog').open) return;
         data = payload.controls; zigbee = payload.zigbee; energyDevices = payload.energy_devices || [];
-        locationRegistry = payload.locations || locationRegistry; render();
+        locationRegistry = payload.locations || locationRegistry; roomSync = payload.tuya_room_sync || roomSync; render();
       } catch { /* Keep the current map available while disconnected. */ }
     }
     function renderRoomRegions() {
@@ -1862,6 +1874,16 @@ HTML = r"""<!doctype html>
         const select = plantSelect(mappingDraft.floors[haFloor.id]);
         select.onchange = () => mappingDraft.floors[haFloor.id] = select.value;
         label.append(select); floorBindings.append(label);
+      }
+      const synced = document.getElementById('tuyaRoomBindings'); synced.replaceChildren();
+      mappingDraft.tuya_rooms ||= {};
+      document.getElementById('tuyaSyncStatus').textContent = roomSync.error || (roomSync.updated_at ? `Ultima sincronizacao: ${new Date(roomSync.updated_at * 1000).toLocaleString('pt-BR')}` : 'Aguardando primeira sincronizacao');
+      for (const room of roomSync.rooms || []) {
+        const label = document.createElement('label'); label.textContent = room.name + ' → ';
+        const select = document.createElement('select'); select.setAttribute('aria-label', 'Area HA para ' + room.name);
+        options(select, [['','Nao sincronizar'], ...locationRegistry.areas.map(a => [a.id,a.name])], mappingDraft.tuya_rooms[room.key] ?? room.area_id);
+        select.onchange = () => { mappingDraft.tuya_rooms[room.key] = select.value; };
+        label.append(select); synced.append(label, document.createElement('br'));
       }
       const rows = document.getElementById('roomBindings'); rows.replaceChildren();
       for (const area of locationRegistry.areas) {
@@ -1964,6 +1986,16 @@ class Handler(BaseHTTPRequestHandler):
             "application/json; charset=utf-8",
         )
 
+    def cached_learning(self):
+        try:
+            data = json.loads((DATA_DIR / 'energy-learning.json').read_text())
+            import time
+            if time.time() - data.get('updated_at', 0) > 3600:
+                return {'devices': {}, 'status': 'Comparacao aguardando atualizacao'}
+            return data
+        except (OSError, ValueError):
+            return {'devices': {}}
+
     def do_GET(self):
         path = unquote(self.path.split("?", 1)[0])
         if path == "/":
@@ -1975,8 +2007,9 @@ class Handler(BaseHTTPRequestHandler):
             dashboard = dashboard_config()
             network = zigbee_devices(controls, dashboard)
             self.send_json(200, {"controls": controls, "images": floor_images(), "dashboard": dashboard, "zigbee": network,
-                                 "energy_devices": energy.discover(controls, location_registry(), normalize_device),
+                                 "energy_devices": energy.discover(controls, location_registry(), normalize_device, self.cached_learning()),
                                  "fixtures": json.loads((ASSETS / "floor-fixtures.json").read_text()),
+                                 "tuya_room_sync": {k: v for k, v in tuya_rooms.read_state(DATA_DIR).items() if k in ("rooms", "updated_at", "error", "assigned")},
                                  "channel_names": tuya_names.read_cache(DATA_DIR).get("names", {}),
                                  "locations": {k: v for k, v in location_registry().items() if k in ("floors", "areas")}})
             return
@@ -2051,6 +2084,7 @@ def main():
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
+    background_sync.start(HA_CONFIG, DATA_DIR, CONTROLS, OPTIONS_PATH)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"Editor de posicoes: http://{args.host}:{args.port}")
     server.serve_forever()

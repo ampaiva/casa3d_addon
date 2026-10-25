@@ -123,3 +123,53 @@ mostradas como pendentes. Não se infere fase pela tensão, consumo ou cômodo, 
 se atribui o circuito de um gateway a todos os dispositivos conectados a ele.
 As cargas/lâmpadas mantêm suas posições independentes. O painel Energia do HA
 não é alterado; a descoberta alimenta a visão de energia da Casa 3D.
+
+## Sincronização Tuya → Home Assistant (0.7.0)
+
+O complemento usa a conta cloud LocalTuya já configurada e o acesso autorizado
+à API do HA (`homeassistant_api: true`). A cada 15 minutos, mesmo sem navegador
+aberto, consulta os cômodos Tuya e associa dispositivos com área vazia no HA.
+Os vínculos usam IDs de casa/cômodo e de dispositivos, incluindo representações
+Tuya e LocalTuya. Nomes iguais são comparados sem acentos, espaços extras e
+preposições; “Sala de Estar” corresponde a “Sala”. Nomes ambíguos ficam pendentes.
+Cômodos ainda inexistentes são criados no HA, com andar herdado apenas quando
+os dispositivos já localizados evidenciam um único andar. Ainda é necessário
+marcar a região de cada cômodo novo na planta uma vez.
+
+Uma associação manual preexistente no HA tem prioridade. Dispositivos que a
+sincronização associou podem acompanhar mudanças de cômodo no Tuya; se sua
+área for alterada ou limpa manualmente no HA, a sincronização para de movê-los.
+Em **Cômodos → Sincronização de cômodos Tuya → HA**, é possível escolher uma
+área correspondente diferente ou ignorar um cômodo. Isso não sobrescreve áreas
+manuais. As alterações entram no próximo ciclo (até 15 minutos).
+
+Os registros do HA são atualizados pela API oficial, nunca editando `.storage`.
+Credenciais ficam na instalação e não são enviadas à interface. A configuração
+`tuya_room_sync: false` desativa novas sincronizações, preservando os vínculos
+já feitos. O estado de propriedade dos vínculos fica em `/data/tuya-room-sync.json`;
+não o apague para evitar perder a distinção entre áreas automáticas e manuais.
+
+### Correção da tensão da tomada 16A Estimate Socket
+
+`tuya_voltage_fix` instala em `/config/tuya_quirks/casa3d_voltage.py` um ajuste
+persistente para o produto `vSu2uIvNamkj9gdG`: o datapoint 6 (`cur_voltage`) usa
+escala 1, convertendo 1250 em 125 V. Usa o carregador de quirks do Tuya disponível
+na versão do HA instalada e recarrega somente a integração Tuya quando o arquivo
+muda. Não altera o núcleo do HA, outras grandezas ou o histórico já gravado.
+Desativar a opção interrompe novas instalações; para reverter a correção ativa,
+remova o arquivo de quirk e recarregue a integração Tuya. Isso restaura a leitura
+original sem transformar dados históricos.
+
+### Identificação passiva da alimentação
+
+`energy_learning` compara até 24 horas de potência das cargas com os canais A/B/C
+dos medidores. Normaliza W/kW, ignora valores inválidos e exige pelo menos seis
+variações coincidentes, incluindo duas subidas e duas descidas, concordância de
+80% e vantagem mínima de 25 pontos percentuais sobre o segundo candidato.
+Sinais iguais em dois medidores são considerados ambíguos. Não aciona aparelhos.
+
+O resultado aparece na visão Elétrica como **alimentação provável**, com medidor,
+canal e evidência. Não vira um circuito cadastrado: um medidor de quadro não
+identifica o disjuntor individual. Canal A/B/C também não é tratado como L1/L2/L3
+sem confirmação da ligação física. Vínculos elétricos explícitos continuam tendo
+prioridade. Falhas ou resultados antigos deixam de apresentar candidatos atuais.

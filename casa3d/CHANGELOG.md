@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+
+- Sincroniza cômodos Tuya com áreas do HA a cada 15 minutos, usando a conta LocalTuya existente.
+- Preserva áreas atribuídas manualmente e permite escolher equivalências na tela Cômodos.
+- Usa a API do HA para atualizar áreas; requer acesso homeassistant_api do complemento.
+- Corrige a tensão do produto 16A Estimate Socket via quirk persistente (1250 → 125 V), sem alterar o núcleo ou o histórico do HA.
+- Compara passivamente variações de potência com medidores por fase e apresenta alimentação provável quando há evidência suficiente.
+- Não aciona cargas e não atribui circuito ou fase lógica sem dados; mantém vínculos explícitos prioritários.
+
 ## 0.6.0
 
 - Vincula andares e cômodos do HA às plantas e permite marcar regiões com dois cliques.

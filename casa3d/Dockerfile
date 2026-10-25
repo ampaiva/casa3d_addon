@@ -19,6 +19,7 @@ COPY requirements.txt .
 RUN pip3 install --break-system-packages --no-cache-dir -r requirements.txt
 
 COPY app ./app
+COPY ha ./ha
 COPY assets ./assets
 COPY scripts ./scripts
 COPY casa3d-controls.json ./casa3d-controls.json
