@@ -29,14 +29,13 @@ def install(config_dir, data_dir, client):
         # before attempting it again on the next cycle or after a restart.
         entities = client.call('config/entity_registry/list')
         voltage_entities = {e['entity_id'] for e in entities if e.get('device_id') in matching_ids
-                            and not e.get('disabled_by')
-                            and (e.get('device_class') or e.get('original_device_class')) == 'voltage'}
+                            and not e.get('disabled_by')}
         for state in client.call('get_states'):
             try:
                 corrected = 80 <= float(state['state']) <= 300
             except (ValueError, TypeError):
                 continue
-            if state['entity_id'] in voltage_entities and state.get('attributes', {}).get('unit_of_measurement') == 'V' and corrected:
+            if state['entity_id'] in voltage_entities and state.get('attributes', {}).get('unit_of_measurement') == 'V' and state.get('attributes', {}).get('device_class') == 'voltage' and corrected:
                 status_path.write_text(json.dumps({'applied_hash': digest, 'updated_at': time.time(),
                                                   'status': 'Correcao de escala confirmada pela leitura do HA'}))
                 return
