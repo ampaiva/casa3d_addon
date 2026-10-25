@@ -2,7 +2,7 @@
 MEASUREMENTS = {'energy', 'power', 'current', 'voltage'}
 
 
-def discover(controls, registry, normalize):
+def discover(controls, registry, normalize, learning=None):
     devices = {d['id']: d for d in registry['devices'] if not d.get('disabled_by')}
     entities = {e['entity_id']: e for e in registry['entities'] if not e.get('disabled_by') and not e.get('hidden_by')}
     points = {key: (floor, point) for floor, positions in controls.get('device_positions', {}).items()
@@ -45,6 +45,7 @@ def discover(controls, registry, normalize):
         result.append({'device_id': device_id, 'key': key, 'title': point.get('title', key),
                        'area': point.get('ha_area_name', ''), 'floor': floor, 'readings': readings,
                        'assignment': assignment,
+                       'learning': (learning or {}).get('devices', {}).get(device_id, {'status': 'Comparacao de consumo aguardando dados'}),
                        'assignment_status': 'Identificado' if assignment else
                        ('Vinculos conflitantes' if candidates else 'Quadro, circuito e fase a identificar')})
     return result
