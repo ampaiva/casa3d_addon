@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1
+
+- Corrige o início da sincronização no serviço s6, lendo a credencial do Supervisor no arquivo padrão preservado pela base do HA.
+- Exige cobertura dos canais concorrentes antes de apresentar uma alimentação provável.
+
 ## 0.7.0
 
 - Sincroniza cômodos Tuya com áreas do HA a cada 15 minutos, usando a conta LocalTuya existente.

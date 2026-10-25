@@ -80,7 +80,7 @@ def compare(device, meters):
         return {'status': 'Sem medidores por fase disponiveis'}
     best = scores[0]
     runner = scores[1]['score'] if len(scores) > 1 else 0
-    confident = (best['matches'] >= 6 and best['rises'] >= 2 and best['falls'] >= 2
+    confident = (all(s['compared'] >= 6 for s in scores) and best['matches'] >= 6 and best['rises'] >= 2 and best['falls'] >= 2
                  and best['score'] >= .8 and best['score'] - runner >= .25)
     return {'status': 'Associacao provavel' if confident else 'Aguardando variacoes suficientes e distintas',
             'candidate': best if confident else None, 'events': len(events)}

@@ -2,11 +2,23 @@
 import json
 import os
 from urllib.request import Request, urlopen
+from pathlib import Path
+
+
+def supervisor_token(environ=None, env_dir=Path('/run/s6/container_environment')):
+    environment = os.environ if environ is None else environ
+    token = environment.get('SUPERVISOR_TOKEN')
+    if token:
+        return token
+    try:
+        return (env_dir / 'SUPERVISOR_TOKEN').read_text().strip()
+    except OSError:
+        return ''
 
 
 class HAClient:
     def __init__(self):
-        self.token = os.environ.get('SUPERVISOR_TOKEN', '')
+        self.token = supervisor_token()
         if not self.token:
             raise RuntimeError('Acesso ao Home Assistant indisponivel')
         self.socket = None
