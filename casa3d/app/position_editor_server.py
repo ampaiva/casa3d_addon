@@ -11,9 +11,11 @@ from pathlib import Path
 from urllib.parse import unquote
 
 try:
-    from . import tuya_names
+    from . import tuya_names, locations, energy
 except ImportError:
     import tuya_names
+    import locations
+    import energy
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -73,6 +75,8 @@ def ensure_device_positions(data):
 
         for key, group in groups.items():
             channels = sorted({channel_number(item.get("entity", "")) for item in group})
+            if key not in floor_positions and any(key in points for points in positions.values()):
+                continue
             if key in floor_positions:
                 override = DEVICE_OVERRIDES.get(key, {})
                 floor_positions[key].update(
@@ -134,39 +138,17 @@ def read_registry(name, field):
     return json.loads(source.read_text())["data"][field] if source.exists() else []
 
 
+def location_registry():
+    registry = {key: read_registry("core." + name + "_registry", key)
+            for key, name in [("floors", "floor"), ("areas", "area"),
+                              ("devices", "device"), ("entities", "entity")]}
+    for floor in registry["floors"]:
+        floor["id"] = floor.get("floor_id") or floor.get("id")
+    return registry
+
+
 def discover_sensors(controls):
-    devices = {item["id"]: item for item in read_registry("core.device_registry", "devices")}
-    positions = controls.setdefault("device_positions", {})
-    represented = set()
-    classes = {"door", "window", "opening", "motion", "occupancy", "moisture", "smoke", "gas"}
-    for floor_points in positions.values():
-        for key, point in floor_points.items():
-            if point.get("sensor_device_id"):
-                represented.add(point["sensor_device_id"])
-    for entry in read_registry("core.entity_registry", "entities"):
-        entity = entry["entity_id"]
-        device_id = entry.get("device_id")
-        device = devices.get(device_id, {})
-        device_class = entry.get("device_class") or entry.get("original_device_class")
-        if (not entity.startswith("binary_sensor.") or not device_id or entry.get("disabled_by")
-                or device.get("disabled_by") or device_class not in classes
-                or entry.get("platform") not in ("zha", "zigbee2mqtt", "deconz", "tuya", "localtuya")):
-            continue
-        existing = next((points[entity] for points in positions.values() if entity in points), None)
-        if existing is not None:
-            existing.update({"sensor_device_id": device_id, "device_class": device_class})
-            represented.add(device_id)
-            continue
-        if device_id in represented:
-            continue
-        # Unlocated sensors stay in a provisional strip, never at an invented room location.
-        points = positions.setdefault("terreo", {})
-        index = sum(bool(point.get("sensor_device_id")) for point in points.values())
-        points[entity] = {"title": entry.get("name") or device.get("name_by_user") or device.get("name") or entity,
-            "left": pct_text(3 + (index // 12) * 4), "top": pct_text(8 + (index % 12) * 7),
-            "sensor_device_id": device_id, "device_class": device_class, "position_pending": True}
-        represented.add(device_id)
-    return controls
+    return locations.reconcile(controls, location_registry(), normalize_device)
 
 
 def zigbee_devices(controls, dashboard):
@@ -186,7 +168,7 @@ def zigbee_devices(controls, dashboard):
         positions = controls["device_positions"][floor]
         nodes = {}
         physical_ids = {}
-        sensor_controls = [{"entity": key} for key, point in positions.items() if point.get("sensor_device_id")]
+        sensor_controls = [{"entity": key} for key, point in positions.items() if point.get("ha_device_id") or point.get("sensor_device_id")]
         for control in controls.get(floor, []) + sensor_controls:
             entity = control.get("entity", "")
             key = normalize_device(entity)
@@ -878,6 +860,7 @@ HTML = r"""<!doctype html>
       </div>
       <button id="edit" class="icon-button" title="Editar posicoes" aria-label="Editar posicoes" aria-pressed="false"><i data-lucide="square-pen"></i></button>
       <button id="refreshNames" class="icon-button" title="Atualizar nomes Tuya" aria-label="Atualizar nomes Tuya"><i data-lucide="refresh-cw"></i></button>
+      <button id="locationsButton" title="Vincular andares e comodos">Comodos</button>
       <button id="save" class="primary edit-only">Salvar</button>
       <span id="status" class="status edit-only"></span>
     </div>
@@ -916,6 +899,16 @@ HTML = r"""<!doctype html>
       <div id="list" class="list"></div>
     </aside>
   </main>
+  <dialog id="locationsDialog" aria-labelledby="locationsTitle">
+    <h2 id="locationsTitle">Andares e comodos do Home Assistant</h2>
+    <p>Vincule os andares às plantas. Marque cada cômodo na imagem ou ajuste sua região em porcentagens.</p>
+    <div id="floorBindings"></div>
+    <div class="table-scroll"><table><thead><tr><th>Cômodo HA</th><th>Planta</th><th>Esquerda %</th><th>Topo %</th><th>Largura %</th><th>Altura %</th><th>Região</th></tr></thead><tbody id="roomBindings"></tbody></table></div>
+    <p>Novos dispositivos aparecem no centro do cômodo. Arraste para ajustar a posição exata.</p>
+    <h3>A localizar</h3><div id="unlocatedList"></div>
+    <p id="locationsStatus" role="status"></p>
+    <button id="locationsCancel">Cancelar</button><button id="locationsSave" class="primary">Salvar vinculos</button>
+  </dialog>
   <dialog id="panelDialog" aria-labelledby="panelTitle">
     <div class="panel-heading"><h2 id="panelTitle"></h2><button id="panelEdit" class="icon-button" title="Editar circuitos" aria-label="Editar circuitos"><i data-lucide="square-pen"></i></button><button id="panelClose" class="icon-button" title="Fechar quadro" aria-label="Fechar quadro"><i data-lucide="x"></i></button></div>
     <p id="panelLocation" class="panel-meta"></p>
@@ -935,12 +928,15 @@ HTML = r"""<!doctype html>
     const topField = document.getElementById('topField');
     let data;
     let images;
+    let locationRegistry = {floors: [], areas: []};
+    let dirty = false;
     let selected = null;
     let dragging = null;
     let editing = false;
     let dashboard = {views: []};
     let icons = {};
     let fixtures = {};
+    let energyDevices = [];
     let zigbee = {};
     let haCards = [];
     let charts = [];
@@ -1101,7 +1097,7 @@ HTML = r"""<!doctype html>
     }
 
     function renderHaLayers() {
-      const key = JSON.stringify([floor(), layers.zigbee, layers.electric]);
+      const key = JSON.stringify([floor(), layers.zigbee, layers.electric, energyDevices, data.infrastructure.feeds]);
       if (key === haLayerKey) return;
       haLayerKey = key;
       const target = document.getElementById('haLayer');
@@ -1113,7 +1109,6 @@ HTML = r"""<!doctype html>
       haCards = [];
       document.body.classList.toggle('electrical-page', floor() === 'eletrica');
       const view = dashboard.views.find(v => v.path === floor());
-      if (!view) return;
       if (floor() === 'eletrica') {
         const overview = document.createElement('div'); overview.className = 'panels-overview';
         for (const [id, panel] of Object.entries(data.infrastructure.panels)) {
@@ -1121,7 +1116,28 @@ HTML = r"""<!doctype html>
           button.textContent = panel.title + ' · Deposito'; button.addEventListener('click', () => openPanel(id)); overview.appendChild(button);
         }
         electrical.appendChild(overview);
-        for (const section of view.sections || []) {
+        const discovered = document.createElement('div'); discovered.className = 'ha-section';
+        const heading = document.createElement('h2'); heading.textContent = 'Energia dos dispositivos'; discovered.append(heading);
+        for (const device of energyDevices) {
+          const card = document.createElement('div'); card.className = 'details';
+          const title = document.createElement('h3'); title.textContent = device.title; card.append(title);
+          const location = document.createElement('p'); location.textContent = device.area || 'Comodo a identificar'; card.append(location);
+          const feed = resolvedFeeds()[device.key] || {};
+          const panel = data.infrastructure.panels[feed.panel];
+          const assignment = document.createElement('p');
+          assignment.textContent = panel ? `${panel.title} · Circuito ${feed.circuit || 'a identificar'} · ${feed.phase || panel.circuits.find(c => String(c.number) === String(feed.circuit))?.phase || 'Fase a identificar'}` : device.assignment_status;
+          if (device.assignment.source) assignment.title = device.assignment.source;
+          card.append(assignment);
+          for (const reading of device.readings) {
+            const button = document.createElement('button'); button.className = 'entity-row';
+            const update = () => { const state = hass()?.states[reading.entity]; button.textContent = `${state?.attributes.friendly_name || ({energy:'Consumo',power:'Potencia',current:'Corrente',voltage:'Tensao'}[reading.kind] || 'Leitura')}: ${entityValue(reading.entity)}`; };
+            button.onclick = () => moreInfo(reading.entity); update(); haCards.push(update); card.append(button);
+          }
+          discovered.append(card);
+        }
+        if (!energyDevices.length) { const empty = document.createElement('p'); empty.textContent = 'Nenhuma medicao de energia encontrada no HA.'; discovered.append(empty); }
+        electrical.append(discovered);
+        for (const section of view?.sections || []) {
           const column = document.createElement('div');
           column.className = 'ha-section';
           electrical.appendChild(column);
@@ -1129,6 +1145,7 @@ HTML = r"""<!doctype html>
         }
         return;
       }
+      if (!view) return;
       const source = view.cards?.find(c => c.type === 'picture-elements');
       if (!source) return;
       const elements = (source.elements || []).filter(element => {
@@ -1162,11 +1179,16 @@ HTML = r"""<!doctype html>
       select.value = value || '';
     }
 
+    function resolvedFeeds() {
+      const feeds = {};
+      for (const device of energyDevices) if (device.assignment.panel) feeds[device.key] = device.assignment;
+      return {...feeds, ...data.infrastructure.feeds};
+    }
     function renderFeedFields() {
       const fields = document.getElementById('feedFields');
       fields.style.display = editing && selected?.kind === 'device' && !selected.key.startsWith('zigbee:') ? 'grid' : 'none';
       if (fields.style.display === 'none') return;
-      const feed = data.infrastructure.feeds[selected.key] || {};
+      const feed = resolvedFeeds()[selected.key] || {};
       options(document.getElementById('feedPanel'), [['','Nao cadastrado'], ...Object.entries(data.infrastructure.panels).map(([id,p]) => [id,p.title])], feed.panel);
       const panel = data.infrastructure.panels[feed.panel];
       options(document.getElementById('feedCircuit'), [['','Nao cadastrado'], ...(panel?.circuits || []).map(c => [String(c.number), `${c.number} · ${c.name || 'Sem nome'}`])], String(feed.circuit || ''));
@@ -1180,7 +1202,7 @@ HTML = r"""<!doctype html>
           circuit: id === 'feedPanel' ? '' : document.getElementById('feedCircuit').value,
           phase: document.getElementById('feedPhase').value
         };
-        status.textContent = 'Alteracoes nao salvas'; renderFeedFields(); renderWires(itemsForFloor());
+        dirty = true; status.textContent = 'Alteracoes nao salvas'; renderFeedFields(); renderWires(itemsForFloor());
       });
     }
 
@@ -1212,7 +1234,7 @@ HTML = r"""<!doctype html>
           name.textContent = circuit.name || 'Nao cadastrado'; phase.textContent = circuit.phase || 'Nao cadastrada';
           reading.textContent = circuit.entity ? entityValue(circuit.entity) : 'Sem leitura'; reading.dataset.entity = circuit.entity || '';
         }
-        const assigned = Object.entries(data.infrastructure.feeds).filter(([,f]) => f.panel === panelId && String(f.circuit) === String(circuit.number)).map(([key]) => {
+        const assigned = Object.entries(resolvedFeeds()).filter(([,f]) => f.panel === panelId && String(f.circuit) === String(circuit.number)).map(([key]) => {
           return Object.values(data.device_positions).map(points => points[key]?.title).find(Boolean) || key;
         });
         if (assigned.length) { const labels = document.createElement('span'); labels.className = 'circuit-devices'; labels.textContent = assigned.join(', '); name.appendChild(labels); }
@@ -1225,7 +1247,7 @@ HTML = r"""<!doctype html>
     document.getElementById('panelEdit').addEventListener('click', () => { panelEditing = !panelEditing; renderPanel(); });
     document.getElementById('panelClose').addEventListener('click', () => document.getElementById('panelDialog').close());
     document.getElementById('panelCancel').addEventListener('click', () => { panelDraft = structuredClone(data.infrastructure.panels[panelId]); panelEditing = false; renderPanel(); });
-    function applyPanel() { data.infrastructure.panels[panelId] = structuredClone(panelDraft); status.textContent = 'Alteracoes nao salvas'; render(); }
+    function applyPanel() { data.infrastructure.panels[panelId] = structuredClone(panelDraft); dirty = true; status.textContent = 'Alteracoes nao salvas'; render(); }
     document.getElementById('panelSave').addEventListener('click', async () => {
       applyPanel(); const button = document.getElementById('panelSave'); button.disabled = true;
       try { await persistControls(); panelEditing = false; renderPanel(); document.getElementById('panelStatus').textContent = 'Salvo'; }
@@ -1316,10 +1338,11 @@ HTML = r"""<!doctype html>
             entity: network?.entity || key,
             network,
             deviceClass: point.device_class,
+            autoDiscovered: point.auto_discovered,
             positionPending: point.position_pending,
             left: point.left,
             top: point.top,
-            model: point.device_class ? 'Sensor' : isBreakerDevice ? 'Disjuntor Zigbee' : (isSwitchDevice ? 'Girier' : (point.model || (channels.length > 1 ? 'Modulo multicanal' : 'Modulo Zigbee'))),
+            model: point.device_class ? 'Sensor' : isBreakerDevice ? 'Disjuntor Zigbee' : (isSwitchDevice && !point.auto_discovered ? 'Girier' : (point.model || (point.auto_discovered ? 'Dispositivo HA' : channels.length > 1 ? 'Modulo multicanal' : 'Modulo Zigbee'))),
             channels,
             channelNames: channelNamesByDevice[key] || {}
           });
@@ -1351,7 +1374,7 @@ HTML = r"""<!doctype html>
         item.left = point.left;
         item.top = point.top;
       }
-      status.textContent = 'Alteracoes nao salvas';
+      dirty = true; status.textContent = 'Alteracoes nao salvas';
     }
 
     function stagePoint(event) {
@@ -1441,7 +1464,7 @@ HTML = r"""<!doctype html>
         wires.appendChild(line);
       });
       if (layers.panels && layers.devices && layers.electric) {
-        for (const [key, feed] of Object.entries(data.infrastructure.feeds)) {
+        for (const [key, feed] of Object.entries(resolvedFeeds())) {
           const device = devices.get(key), panel = data.infrastructure.panels[feed.panel];
           if (!device || !panel || panel.floor !== floor()) continue;
           const circuit = panel.circuits.find(c => String(c.number) === String(feed.circuit));
@@ -1526,7 +1549,8 @@ HTML = r"""<!doctype html>
       renderHaLayers();
       renderFixtures();
 
-      stage.querySelectorAll('.marker').forEach(node => node.remove());
+      stage.querySelectorAll('.marker, .room-region').forEach(node => node.remove());
+      renderRoomRegions();
       document.getElementById('signalLegend').style.display = layers.signal && currentFloor !== 'eletrica' ? 'flex' : 'none';
       const items = currentFloor !== 'eletrica' ? itemsForFloor() : [];
       if (selected && !items.some(item => markerId(item) === markerId(selected))) {
@@ -1539,7 +1563,7 @@ HTML = r"""<!doctype html>
         marker.type = 'button';
         const isModule = item.kind === 'device' && item.channels && item.channels.length > 1;
         const isBreakerImage = item.kind === 'device' && item.entity === 'switch.tz3000_cayepv1a_ts011f';
-        const isGirierImage = item.kind === 'device'
+        const isGirierImage = !item.autoDiscovered && item.kind === 'device'
           && item.entity.startsWith('switch.')
           && !isBreakerImage
           && item.channels
@@ -1580,7 +1604,7 @@ HTML = r"""<!doctype html>
           if (item.kind === 'load') marker.innerHTML = iconHtml(item.icon || 'mdi:lightbulb');
           else if (item.network?.icon && !item.entity?.startsWith('switch.')) marker.innerHTML = iconHtml(item.network.icon);
           if (item.deviceClass) {
-            const symbol = {door:'door-open', window:'panels-top-left', opening:'door-open', motion:'scan-eye', occupancy:'scan-eye', moisture:'droplets', smoke:'flame', gas:'wind'}[item.deviceClass];
+            const symbol = {door:'door-open', window:'panels-top-left', opening:'door-open', motion:'scan-eye', occupancy:'scan-eye', moisture:'droplets', smoke:'flame', gas:'wind'}[item.deviceClass] || 'circle-dot';
             marker.innerHTML = `<i data-lucide="${symbol}"></i>`;
             marker.style.background = '#287a65';
           }
@@ -1731,6 +1755,8 @@ HTML = r"""<!doctype html>
         throw new Error('Erro ao salvar');
       }
       data = await response.json();
+      try { const metadata = await (await fetch('api/controls')).json(); energyDevices = metadata.energy_devices || []; zigbee = metadata.zigbee; } catch { /* Saved positions remain available offline. */ }
+      dirty = false;
       status.textContent = 'Salvo';
       render();
     }
@@ -1743,9 +1769,11 @@ HTML = r"""<!doctype html>
       const payload = await response.json();
       data = payload.controls;
       images = payload.images;
+      locationRegistry = payload.locations || {floors: [], areas: []};
       dashboard = payload.dashboard;
       zigbee = payload.zigbee;
       fixtures = payload.fixtures || {};
+      energyDevices = payload.energy_devices || [];
       channelNames = payload.channel_names || {};
       icons = await (await fetch('assets/mdi-icons.json')).json();
       if (!hass()) document.getElementById('connection').textContent = 'As visoes ao vivo ficam disponiveis dentro do Home Assistant.';
@@ -1770,6 +1798,7 @@ HTML = r"""<!doctype html>
       status.textContent = 'Pronto';
       render();
       refreshNames();
+      setInterval(syncLocations, 30000);
       setInterval(() => {
         document.querySelectorAll('#panelCircuits td[data-entity]').forEach(td => { if (td.dataset.entity) td.textContent = entityValue(td.dataset.entity); });
         updateFixtures();
@@ -1786,6 +1815,123 @@ HTML = r"""<!doctype html>
       }, 1000);
     }
 
+    const locationsDialog = document.getElementById('locationsDialog');
+    let mappingDraft;
+    let drawingRoom = null;
+    function plantSelect(value, inherited = false) {
+      const select = document.createElement('select');
+      for (const [id, label] of [['', inherited ? 'Usar andar do HA' : 'Sem vinculo'], ['terreo', 'Terreo'], ['superior', 'Superior']]) {
+        select.add(new Option(label, id));
+      }
+      select.value = value || ''; return select;
+    }
+    async function syncLocations() {
+      if (dirty || editing || drawingRoom || locationsDialog.open || document.getElementById('panelDialog').open) return;
+      try {
+        const response = await fetch('api/controls');
+        if (!response.ok) return;
+        const payload = await response.json();
+        // Recheck after the request: the user may have started editing in the meantime.
+        if (dirty || editing || drawingRoom || locationsDialog.open || document.getElementById('panelDialog').open) return;
+        data = payload.controls; zigbee = payload.zigbee; energyDevices = payload.energy_devices || [];
+        locationRegistry = payload.locations || locationRegistry; render();
+      } catch { /* Keep the current map available while disconnected. */ }
+    }
+    function renderRoomRegions() {
+      if (!editing) return;
+      const mapping = data.location_mapping || {floors:{}, rooms:{}};
+      for (const area of locationRegistry.areas) {
+        const room = mapping.rooms?.[area.id];
+        if (!room || (room.floor || mapping.floors?.[area.floor_id]) !== floor()) continue;
+        const box = document.createElement('div'); box.className = 'room-region';
+        Object.assign(box.style, {position:'absolute', pointerEvents:'none', border:'2px dashed #287a65',
+          boxSizing:'border-box', color:'#145240', background:'#287a6510',
+          left:room.left+'%', top:room.top+'%', width:room.width+'%', height:room.height+'%'});
+        const caption = document.createElement('span'); caption.textContent = area.name;
+        Object.assign(caption.style, {position:'absolute', bottom:'100%', left:'-2px', whiteSpace:'nowrap',
+          fontSize:'11px', padding:'2px 4px', background:'#e8f3ed', borderRadius:'3px'});
+        box.append(caption); stage.append(box);
+      }
+    }
+    document.getElementById('locationsButton').onclick = () => openLocations(false);
+    function openLocations(keepDraft = false) {
+      if (!keepDraft) mappingDraft = structuredClone(data.location_mapping || {floors:{}, rooms:{}});
+      const floorBindings = document.getElementById('floorBindings'); floorBindings.replaceChildren();
+      for (const haFloor of locationRegistry.floors) {
+        const label = document.createElement('label'); label.textContent = haFloor.name + ' ';
+        const select = plantSelect(mappingDraft.floors[haFloor.id]);
+        select.onchange = () => mappingDraft.floors[haFloor.id] = select.value;
+        label.append(select); floorBindings.append(label);
+      }
+      const rows = document.getElementById('roomBindings'); rows.replaceChildren();
+      for (const area of locationRegistry.areas) {
+        const row = document.createElement('tr'); const name = document.createElement('td');
+        name.textContent = area.name; row.append(name);
+        const cell = document.createElement('td'); const enabled = document.createElement('input');
+        enabled.type = 'checkbox'; enabled.checked = Boolean(mappingDraft.rooms[area.id]);
+        enabled.setAttribute('aria-label', 'Vincular ' + area.name);
+        const room = {...{floor:'', left:40, top:40, width:20, height:20}, ...mappingDraft.rooms[area.id]};
+        const select = plantSelect(room.floor, true); select.setAttribute('aria-label', 'Planta de ' + area.name);
+        const update = () => { if (enabled.checked) mappingDraft.rooms[area.id] = room; else delete mappingDraft.rooms[area.id]; };
+        enabled.onchange = update; select.onchange = () => { room.floor = select.value; update(); };
+        cell.append(enabled, select); row.append(cell);
+        for (const key of ['left','top','width','height']) {
+          const td = document.createElement('td'); const field = document.createElement('input');
+          field.type = 'number'; field.min = '0'; field.max = '100'; field.step = '0.01'; field.style.width = '5em';
+          field.value = room[key]; field.required = true; field.setAttribute('aria-label', area.name + ' ' + key);
+          field.oninput = () => { room[key] = Number(field.value); update(); }; td.append(field); row.append(td);
+        }
+        const drawCell = document.createElement('td'); const draw = document.createElement('button');
+        draw.textContent = 'Marcar na planta'; draw.type = 'button';
+        draw.onclick = () => {
+          const target = room.floor || mappingDraft.floors[area.floor_id];
+          if (!target) { document.getElementById('locationsStatus').textContent = 'Escolha a planta do andar ou do comodo primeiro.'; return; }
+          enabled.checked = true; update(); floorSelect.value = target;
+          drawingRoom = {room, start:null}; selected = null; dragging = null;
+          floorSelect.disabled = true; document.getElementById('locationsButton').disabled = true;
+          document.getElementById('edit').disabled = true; locationsDialog.close();
+          status.textContent = 'Marque dois cantos opostos do comodo na planta';
+          document.getElementById('connection').textContent = 'Marque dois cantos opostos do comodo. Esc cancela.';
+          stage.style.cursor = 'crosshair'; render();
+        };
+        drawCell.append(draw); row.append(drawCell); rows.append(row);
+      }
+      const pending = document.getElementById('unlocatedList'); pending.replaceChildren();
+      for (const point of Object.values(data.device_positions?.unlocated || {})) {
+        const line = document.createElement('p');
+        line.textContent = [point.title, point.ha_area_name, point.location_reason].filter(Boolean).join(' · '); pending.append(line);
+      }
+      if (!pending.children.length) pending.textContent = 'Nenhum dispositivo pendente.';
+      document.getElementById('locationsStatus').textContent = locationRegistry.areas.length ? '' : 'Nenhum comodo encontrado. Confira o acesso ao cadastro do Home Assistant.';
+      locationsDialog.showModal();
+    };
+    stage.addEventListener('pointerdown', event => {
+      if (!drawingRoom) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      const point = stagePoint(event);
+      if (!drawingRoom.start) { drawingRoom.start = point; document.getElementById('connection').textContent = 'Agora marque o canto oposto. Esc cancela.'; return; }
+      const start = drawingRoom.start;
+      const left = Math.max(0, Math.min(start.left, point.left));
+      const top = Math.max(0, Math.min(start.top, point.top));
+      const width = Math.min(100 - left, Math.abs(point.left - start.left));
+      const height = Math.min(100 - top, Math.abs(point.top - start.top));
+      if (width < 0.5 || height < 0.5) { document.getElementById('connection').textContent = 'Marque um canto mais distante.'; return; }
+      Object.assign(drawingRoom.room, {left:+left.toFixed(2), top:+top.toFixed(2), width:+width.toFixed(2), height:+height.toFixed(2)});
+      drawingRoom = null; floorSelect.disabled = false; document.getElementById('locationsButton').disabled = false; document.getElementById('edit').disabled = false; stage.style.cursor = ''; document.getElementById('connection').textContent = '';
+      openLocations(true);
+    }, true);
+    window.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && drawingRoom) {
+        drawingRoom = null; floorSelect.disabled = false; document.getElementById('locationsButton').disabled = false; document.getElementById('edit').disabled = false; stage.style.cursor = ''; document.getElementById('connection').textContent = ''; openLocations(true);
+      }
+    });
+    document.getElementById('locationsCancel').onclick = () => locationsDialog.close();
+    document.getElementById('locationsSave').onclick = async () => {
+      const previous = data.location_mapping;
+      data.location_mapping = mappingDraft;
+      try { await persistControls(); locationsDialog.close(); }
+      catch { data.location_mapping = previous; document.getElementById('locationsStatus').textContent = 'Nao foi possivel salvar. Confira se as regioes cabem na planta e tente novamente.'; }
+    };
     boot();
   </script>
 </body>
@@ -1829,8 +1975,10 @@ class Handler(BaseHTTPRequestHandler):
             dashboard = dashboard_config()
             network = zigbee_devices(controls, dashboard)
             self.send_json(200, {"controls": controls, "images": floor_images(), "dashboard": dashboard, "zigbee": network,
+                                 "energy_devices": energy.discover(controls, location_registry(), normalize_device),
                                  "fixtures": json.loads((ASSETS / "floor-fixtures.json").read_text()),
-                                 "channel_names": tuya_names.read_cache(DATA_DIR).get("names", {})})
+                                 "channel_names": tuya_names.read_cache(DATA_DIR).get("names", {}),
+                                 "locations": {k: v for k, v in location_registry().items() if k in ("floors", "areas")}})
             return
         if path.startswith("/assets/"):
             name = Path(path.removeprefix("/assets/")).name
@@ -1890,6 +2038,7 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         try:
             payload = json.loads(self.rfile.read(length))
+            discover_sensors(payload)
             save_controls(payload)
         except Exception as exc:
             self.send_json(400, {"error": str(exc)})
