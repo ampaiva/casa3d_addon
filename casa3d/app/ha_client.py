@@ -38,6 +38,8 @@ class HAClient:
         self.socket.close()
 
     def call(self, command, **kwargs):
+        # Core waits for service completion; cloud integration reloads can take minutes.
+        self.socket.settimeout(180 if command == 'call_service' else 30)
         self.sequence += 1
         self.socket.send(json.dumps({'id': self.sequence, 'type': command, **kwargs}))
         while True:
