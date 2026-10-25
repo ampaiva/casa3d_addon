@@ -22,23 +22,8 @@ def install(config_dir, data_dir, client):
     except (OSError, ValueError):
         status = {}
     target = config_dir / 'tuya_quirks/casa3d_voltage.py'
-    if target.exists() and target.read_bytes() == content:
-        if status.get('applied_hash') == digest:
-            return
-        # A disconnected caller does not cancel Core's reload. Verify the result
-        # before attempting it again on the next cycle or after a restart.
-        entities = client.call('config/entity_registry/list')
-        voltage_entities = {e['entity_id'] for e in entities if e.get('device_id') in matching_ids
-                            and not e.get('disabled_by')}
-        for state in client.call('get_states'):
-            try:
-                corrected = 80 <= float(state['state']) <= 300
-            except (ValueError, TypeError):
-                continue
-            if state['entity_id'] in voltage_entities and state.get('attributes', {}).get('unit_of_measurement') == 'V' and state.get('attributes', {}).get('device_class') == 'voltage' and corrected:
-                status_path.write_text(json.dumps({'applied_hash': digest, 'updated_at': time.time(),
-                                                  'status': 'Correcao de escala confirmada pela leitura do HA'}))
-                return
+    if target.exists() and target.read_bytes() == content and status.get('applied_hash') == digest:
+        return
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists() and target.read_bytes() != content:
         backup = data_dir / ('voltage-quirk-before-' + str(int(time.time())) + '.py')
@@ -46,10 +31,19 @@ def install(config_dir, data_dir, client):
     temporary = target.with_suffix('.tmp')
     temporary.write_bytes(content)
     temporary.replace(target)
+    # Persist the cutover before requesting reload, so historical deciwatts are
+    # distinguishable from corrected watts. A previous voltage-only revision
+    # cannot acknowledge that the new power correction was activated.
+    if not status.get('power_scale_active'):
+        status['power_scale_cutover'] = time.time()
+    status.update(pending_hash=digest, power_history_divisor=10, power_scale_active=False)
+    status_path.write_text(json.dumps(status))
     entries = json.loads((config_dir / '.storage/core.config_entries').read_text())['data']['entries']
     for entry in entries:
         if entry['domain'] == 'tuya':
             client.call('call_service', domain='homeassistant', service='reload_config_entry',
                         service_data={'entry_id': entry['entry_id']})
-    status_path.write_text(json.dumps({'applied_hash': digest, 'updated_at': time.time(),
-                                      'status': 'Correcao de escala do produto 16A Estimate Socket aplicada'}))
+    status.pop('pending_hash', None)
+    status.update(applied_hash=digest, updated_at=time.time(), power_scale_active=True,
+                  status='Correcao de escala de tensao e potencia do produto 16A Estimate Socket aplicada')
+    status_path.write_text(json.dumps(status))

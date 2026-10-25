@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.3
+
+- Usa os seis canais cadastrados dos quadros na comparação automática, excluindo representações antigas e mantendo canais esperados sem leitura como pendência.
+- Unifica vínculos do catálogo e dos cartões de energia, preservando confiança e origem, com associação estável por dispositivo.
+- Corrige a escala de potência do produto 16A Estimate Socket (8020 → 802 W), além da tensão; normaliza somente a análise do histórico anterior, preservando o Recorder.
+- Explica pendências da identificação e trata leituras constantes como válidas até a próxima alteração ou indisponibilidade.
+
 ## 0.7.2
 
 - Aguarda recargas lentas de integrações cloud e reconhece uma correção de tensão já concluída após expirar a conexão, evitando novas recargas desnecessárias.

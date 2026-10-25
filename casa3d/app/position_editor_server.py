@@ -11,12 +11,12 @@ from pathlib import Path
 from urllib.parse import unquote
 
 try:
-    from . import tuya_names, locations, energy, tuya_rooms, background_sync
+    from . import tuya_names, locations, energy, tuya_rooms, background_sync, electrical_catalog
 except ImportError:
     import tuya_names
     import locations
     import energy
-    from app import tuya_rooms, background_sync
+    from app import tuya_rooms, background_sync, electrical_catalog
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -940,6 +940,8 @@ HTML = r"""<!doctype html>
     let icons = {};
     let fixtures = {};
     let energyDevices = [];
+    let electricalCatalog = {rows:[], notes:[]};
+    let meterDiagnostics = {};
     let zigbee = {};
     let haCards = [];
     let charts = [];
@@ -1099,8 +1101,47 @@ HTML = r"""<!doctype html>
       }
     }
 
+    const normalizedText = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+    const isCatalogCard = config => config.type === 'markdown' && normalizedText(config.title) === 'circuitos catalogados';
+    function renderElectricalCatalog(target) {
+      const heading = document.createElement('h2'); heading.textContent = 'Circuitos catalogados'; target.append(heading);
+      const table = document.createElement('table'); const thead = table.createTHead(); const head = thead.insertRow();
+      for (const text of ['Equipamento','Quadro','Fases / canais','Ligacao','Confianca','Origem']) {
+        const th = document.createElement('th'); th.textContent = text; head.append(th);
+      }
+      const body = table.createTBody();
+      const represented = new Set();
+      function append(values) { const row = body.insertRow(); for (const value of values) { const td = row.insertCell(); td.textContent = value || 'A identificar'; } }
+      for (const entry of electricalCatalog.rows || []) {
+        if (entry.device_id) represented.add(entry.device_id);
+        const device = energyDevices.find(d => d.device_id === entry.device_id);
+        const feed = device ? resolvedFeeds()[device.key] : null;
+        const panel = data.infrastructure.panels[feed?.panel];
+        if (panel) {
+          const circuit = panel.circuits.find(c => String(c.number) === String(feed.circuit));
+          append([entry.equipment, panel.title, feed.phase || circuit?.phase, '', 'Cadastro explicito', feed.source || 'Cadastro eletrico']);
+        } else {
+          append([entry.equipment, entry.panel_label, entry.channels.join(' + '), entry.connection, entry.confidence,
+            device?.assignment_conflict ? 'Conflito: revisar vinculos' : entry.device_id ? entry.source : entry.status]);
+        }
+      }
+      for (const device of energyDevices) {
+        if (represented.has(device.device_id)) continue;
+        const feed = resolvedFeeds()[device.key]; const panel = data.infrastructure.panels[feed?.panel];
+        if (panel) {
+          const circuit = panel.circuits.find(c => String(c.number) === String(feed.circuit));
+          append([device.title,panel.title,feed.phase || circuit?.phase,'','Cadastro explicito',feed.source || 'Cadastro eletrico']);
+        } else if (device.learning?.candidate && device.learning.meter && !device.assignment_conflict) {
+          append([device.title,device.learning.meter.panel_label || device.learning.meter.title,device.learning.meter.channel,'',
+            'Provavel',`Comparacao: ${device.learning.candidate.matches} variacoes coincidentes`]);
+        }
+      }
+      const wrap = document.createElement('div'); wrap.className = 'table-scroll'; wrap.append(table); target.append(wrap);
+      for (const text of electricalCatalog.notes || []) { const note = document.createElement('p'); note.textContent = text; target.append(note); }
+    }
+
     function renderHaLayers() {
-      const key = JSON.stringify([floor(), layers.zigbee, layers.electric, energyDevices, data.infrastructure.feeds]);
+      const key = JSON.stringify([floor(), layers.zigbee, layers.electric, energyDevices, electricalCatalog, meterDiagnostics, data.infrastructure.feeds]);
       if (key === haLayerKey) return;
       haLayerKey = key;
       const target = document.getElementById('haLayer');
@@ -1121,6 +1162,13 @@ HTML = r"""<!doctype html>
         electrical.appendChild(overview);
         const discovered = document.createElement('div'); discovered.className = 'ha-section';
         const heading = document.createElement('h2'); heading.textContent = 'Energia dos dispositivos'; discovered.append(heading);
+        if (meterDiagnostics.status) { const warning = document.createElement('p'); warning.textContent = meterDiagnostics.status; discovered.append(warning); }
+        if (meterDiagnostics.expected_channels) {
+          const info = document.createElement('p');
+          info.textContent = `Comparacao automatica: ${meterDiagnostics.active_channels || 0} de ${meterDiagnostics.expected_channels} canais de referencia ativos · ${Object.keys(meterDiagnostics.excluded || {}).length} fontes alternativas fora da comparacao.`;
+          if (meterDiagnostics.missing?.length) info.textContent += ' Canais ausentes impedem concluir a identificacao.';
+          discovered.append(info);
+        }
         for (const device of energyDevices) {
           const card = document.createElement('div'); card.className = 'details';
           const title = document.createElement('h3'); title.textContent = device.title; card.append(title);
@@ -1131,12 +1179,18 @@ HTML = r"""<!doctype html>
           assignment.textContent = panel ? `${panel.title} · Circuito ${feed.circuit || 'a identificar'} · ${feed.phase || panel.circuits.find(c => String(c.number) === String(feed.circuit))?.phase || 'Fase a identificar'}` : device.assignment_status;
           if (device.assignment.source) assignment.title = device.assignment.source;
           card.append(assignment);
-          if (!panel) {
+          const catalog = device.catalog_assignment;
+          if (!panel && catalog && !device.assignment_conflict) {
+            const origin = document.createElement('p');
+            origin.textContent = `${catalog.source} · Confianca registrada: ${catalog.confidence || 'Nao informada'}`;
+            card.append(origin);
+          }
+          if (!panel && !catalog && !device.assignment_conflict) {
             const learning = document.createElement('p');
             const evidence = device.learning || {};
             learning.textContent = evidence.candidate && evidence.meter
               ? `Alimentacao provavel: ${evidence.meter.title} · Canal ${evidence.meter.channel} · ${evidence.candidate.matches} variacoes coincidentes (${Math.round(evidence.candidate.score * 100)}%). Circuito ainda a identificar.`
-              : (evidence.status || 'Comparacao de consumo aguardando dados');
+              : (evidence.status || 'Comparacao de consumo aguardando dados') + (evidence.events !== undefined && evidence.reason !== 'insufficient_events' ? ` · ${evidence.events} variacoes analisadas` : '');
             card.append(learning);
           }
           for (const reading of device.readings) {
@@ -1152,7 +1206,10 @@ HTML = r"""<!doctype html>
           const column = document.createElement('div');
           column.className = 'ha-section';
           electrical.appendChild(column);
-          for (const config of section.cards || []) mountCard(config, column);
+          for (const config of section.cards || []) {
+            if (isCatalogCard(config)) renderElectricalCatalog(column);
+            else mountCard(config, column);
+          }
         }
         return;
       }
@@ -1766,7 +1823,7 @@ HTML = r"""<!doctype html>
         throw new Error('Erro ao salvar');
       }
       data = await response.json();
-      try { const metadata = await (await fetch('api/controls')).json(); energyDevices = metadata.energy_devices || []; zigbee = metadata.zigbee; } catch { /* Saved positions remain available offline. */ }
+      try { const metadata = await (await fetch('api/controls')).json(); energyDevices = metadata.energy_devices || []; electricalCatalog = metadata.electrical_catalog || {rows:[],notes:[]}; meterDiagnostics = metadata.meter_diagnostics || {}; zigbee = metadata.zigbee; } catch { /* Saved positions remain available offline. */ }
       dirty = false;
       status.textContent = 'Salvo';
       render();
@@ -1785,7 +1842,7 @@ HTML = r"""<!doctype html>
       dashboard = payload.dashboard;
       zigbee = payload.zigbee;
       fixtures = payload.fixtures || {};
-      energyDevices = payload.energy_devices || [];
+      energyDevices = payload.energy_devices || []; electricalCatalog = payload.electrical_catalog || {rows:[],notes:[]}; meterDiagnostics = payload.meter_diagnostics || {};
       channelNames = payload.channel_names || {};
       icons = await (await fetch('assets/mdi-icons.json')).json();
       if (!hass()) document.getElementById('connection').textContent = 'As visoes ao vivo ficam disponiveis dentro do Home Assistant.';
@@ -1845,7 +1902,7 @@ HTML = r"""<!doctype html>
         const payload = await response.json();
         // Recheck after the request: the user may have started editing in the meantime.
         if (dirty || editing || drawingRoom || locationsDialog.open || document.getElementById('panelDialog').open) return;
-        data = payload.controls; zigbee = payload.zigbee; energyDevices = payload.energy_devices || [];
+        data = payload.controls; zigbee = payload.zigbee; energyDevices = payload.energy_devices || []; electricalCatalog = payload.electrical_catalog || {rows:[],notes:[]}; meterDiagnostics = payload.meter_diagnostics || {};
         locationRegistry = payload.locations || locationRegistry; roomSync = payload.tuya_room_sync || roomSync; render();
       } catch { /* Keep the current map available while disconnected. */ }
     }
@@ -1990,7 +2047,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             data = json.loads((DATA_DIR / 'energy-learning.json').read_text())
             import time
-            if time.time() - data.get('updated_at', 0) > 3600:
+            if data.get('schema_version') != 2 or time.time() - data.get('updated_at', 0) > 3600:
                 return {'devices': {}, 'status': 'Comparacao aguardando atualizacao'}
             return data
         except (OSError, ValueError):
@@ -2006,8 +2063,13 @@ class Handler(BaseHTTPRequestHandler):
             discover_sensors(controls)
             dashboard = dashboard_config()
             network = zigbee_devices(controls, dashboard)
+            registry = location_registry()
+            catalog = electrical_catalog.resolve(dashboard, controls, registry, DATA_DIR)
+            learning = self.cached_learning()
             self.send_json(200, {"controls": controls, "images": floor_images(), "dashboard": dashboard, "zigbee": network,
-                                 "energy_devices": energy.discover(controls, location_registry(), normalize_device, self.cached_learning()),
+                                 "electrical_catalog": catalog,
+                                 "meter_diagnostics": {**learning.get("meter_diagnostics", {}), "active_channels": len(learning.get("meters", {})), "status": learning.get("status")},
+                                 "energy_devices": energy.discover(controls, registry, normalize_device, learning, catalog),
                                  "fixtures": json.loads((ASSETS / "floor-fixtures.json").read_text()),
                                  "tuya_room_sync": {k: v for k, v in tuya_rooms.read_state(DATA_DIR).items() if k in ("rooms", "updated_at", "error", "assigned")},
                                  "channel_names": tuya_names.read_cache(DATA_DIR).get("names", {}),

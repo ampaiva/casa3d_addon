@@ -20,7 +20,7 @@ def watts(value, unit):
         return None
 
 
-def series(history, unit):
+def series(history, unit, divisor=1, before=None):
     points = []
     for state in history:
         value = watts(state.get('state'), unit)
@@ -28,18 +28,23 @@ def series(history, unit):
         if not stamp:
             continue
         try:
-            points.append((datetime.fromisoformat(stamp.replace('Z', '+00:00')).timestamp(), value))
+            timestamp = datetime.fromisoformat(stamp.replace('Z', '+00:00')).timestamp()
+            if value is not None and before is not None and timestamp < before:
+                value /= divisor
+            points.append((timestamp, value))
         except (ValueError, TypeError):
             continue
     return sorted(points, key=lambda p: p[0])
 
 
-def at(points, timestamp, max_age=180):
+def at(points, timestamp, max_age=None):
     i = bisect_right(points, timestamp, key=lambda p: p[0]) - 1
-    return points[i][1] if i >= 0 and timestamp - points[i][0] <= max_age else None
+    # HA records state changes: a held value remains valid until the next state,
+    # including an explicit unavailable marker. Sparse history is not a data outage.
+    return points[i][1] if i >= 0 and (max_age is None or timestamp - points[i][0] <= max_age) else None
 
 
-def compare(device, meters):
+def compare(device, meters, missing_channels=None):
     """Demand repeated signed transitions and a unique winner across all meters."""
     events = []
     last = -float('inf')
@@ -77,10 +82,21 @@ def compare(device, meters):
                        'compared': compared, 'rises': positive, 'falls': negative})
     scores.sort(key=lambda s: (s['score'], s['matches']), reverse=True)
     if not scores:
-        return {'status': 'Sem medidores por fase disponiveis'}
+        return {'status': 'Sem medidores de referencia ativos', 'candidate': None, 'events': len(events), 'scores': []}
     best = scores[0]
     runner = scores[1]['score'] if len(scores) > 1 else 0
-    confident = (all(s['compared'] >= 6 for s in scores) and best['matches'] >= 6 and best['rises'] >= 2 and best['falls'] >= 2
-                 and best['score'] >= .8 and best['score'] - runner >= .25)
-    return {'status': 'Associacao provavel' if confident else 'Aguardando variacoes suficientes e distintas',
-            'candidate': best if confident else None, 'events': len(events)}
+    coverage = [score for score in scores if score['compared'] < 6]
+    if missing_channels:
+        reason, status = 'missing_channels', 'Medidores de referencia incompletos: %s canal(is) sem leitura' % len(missing_channels)
+    elif len(events) < 6:
+        reason, status = 'insufficient_events', 'Poucas variacoes da carga: %s (minimo 6)' % len(events)
+    elif coverage:
+        reason, status = 'insufficient_coverage', 'Historico insuficiente em %s canal(is) de referencia' % len(coverage)
+    elif best['score'] >= .8 and best['score'] - runner < .25:
+        reason, status = 'ambiguous', 'Canais com sinais semelhantes; alimentacao ainda ambigua'
+    elif best['matches'] < 6 or best['rises'] < 2 or best['falls'] < 2 or best['score'] < .8:
+        reason, status = 'low_agreement', 'Variacoes sem coincidencias suficientes nos dois sentidos'
+    else:
+        reason, status = 'matched', 'Associacao provavel'
+    return {'status': status, 'reason': reason, 'candidate': best if reason == 'matched' else None,
+            'events': len(events), 'scores': scores}
