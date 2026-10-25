@@ -119,7 +119,7 @@ somados, pois medidores podem representar totais, tarifas ou intervalos diferent
 Quadro, circuito e fase são recuperados de vínculos elétricos existentes da Casa
 3D ou de uma leitura cadastrada em um circuito que pertença ao mesmo dispositivo.
 A origem do vínculo aparece na descrição. Relações conflitantes ou ausentes são
-mostradas como pendentes. Não se infere fase pela tensão, consumo ou cômodo, nem
+mostradas como pendentes. Não se infere fase pela tensão ou cômodo, nem
 se atribui o circuito de um gateway a todos os dispositivos conectados a ele.
 As cargas/lâmpadas mantêm suas posições independentes. O painel Energia do HA
 não é alterado; a descoberta alimenta a visão de energia da Casa 3D.
@@ -149,13 +149,17 @@ Credenciais ficam na instalação e não são enviadas à interface. A configura
 já feitos. O estado de propriedade dos vínculos fica em `/data/tuya-room-sync.json`;
 não o apague para evitar perder a distinção entre áreas automáticas e manuais.
 
-### Correção da tensão da tomada 16A Estimate Socket
+### Correção de tensão e potência da tomada 16A Estimate Socket
 
 `tuya_voltage_fix` instala em `/config/tuya_quirks/casa3d_voltage.py` um ajuste
 persistente para o produto `vSu2uIvNamkj9gdG`: o datapoint 6 (`cur_voltage`) usa
-escala 1, convertendo 1250 em 125 V. Usa o carregador de quirks do Tuya disponível
+escala 1, convertendo 1250 em 125 V; o datapoint 5 (`cur_power`) também usa
+escala 1, convertendo 8020 em 802 W. Usa o carregador de quirks do Tuya disponível
 na versão do HA instalada e recarrega somente a integração Tuya quando o arquivo
-muda. Não altera o núcleo do HA, outras grandezas ou o histórico já gravado.
+muda. Não altera o núcleo do HA nem o histórico já gravado. A comparação passiva
+normaliza por 10 somente a potência histórica desse produto anterior à ativação
+do ajuste, registrada em `/data/voltage-fix.json`. Leituras posteriores usam a
+escala corrigida do HA; os registros originais do Recorder são preservados.
 Desativar a opção interrompe novas instalações; para reverter a correção ativa,
 remova o arquivo de quirk e recarregue a integração Tuya. Isso restaura a leitura
 original sem transformar dados históricos.
@@ -173,3 +177,20 @@ canal e evidência. Não vira um circuito cadastrado: um medidor de quadro não
 identifica o disjuntor individual. Canal A/B/C também não é tratado como L1/L2/L3
 sem confirmação da ligação física. Vínculos elétricos explícitos continuam tendo
 prioridade. Falhas ou resultados antigos deixam de apresentar candidatos atuais.
+
+### Referências e catálogo elétrico (0.7.3)
+
+Os canais das entidades **Fase A/B/C** nos cartões **Quadro ...** do painel
+elétrico definem as referências da comparação. Entidades antigas fora desses
+cartões não participam; uma referência cadastrada sem leitura continua sendo
+um impedimento, nunca é descartada para favorecer um resultado. Alternativas
+só substituem a referência quando pertencem ao mesmo dispositivo físico.
+O painel mostra quantos canais estão ativos e o motivo de cada pendência.
+
+A tabela **Circuitos catalogados** e os cartões de energia usam os mesmos vínculos.
+As linhas existentes são associadas a IDs de dispositivos sem adivinhar nomes
+ambíguos, preservando a origem, a confiança e as observações históricas. Os IDs
+ficam em `/data/electrical-catalog-bindings.json`, resistindo a renomeações.
+Esses vínculos não inventam disjuntores nem equivalências entre A/B/C e L1/L2/L3;
+cadastros explícitos de circuito têm prioridade. Uma identificação por comparação
+continua aparecendo como provável, sem se transformar em confirmação física.
