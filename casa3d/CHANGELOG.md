@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2
+
+- Aguarda recargas lentas de integrações cloud e reconhece uma correção de tensão já concluída após expirar a conexão, evitando novas recargas desnecessárias.
+
 ## 0.7.1
 
 - Corrige o início da sincronização no serviço s6, lendo a credencial do Supervisor no arquivo padrão preservado pela base do HA.
