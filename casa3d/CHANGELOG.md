@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+
+- Vincula andares e cômodos do HA às plantas e permite marcar regiões com dois cliques.
+- Descobre dispositivos ativos automaticamente, inclusive eletrodomésticos expostos somente por sensores.
+- Posiciona novos dispositivos dentro do cômodo, preservando os ajustes manuais e acompanhando mudanças de área no HA.
+- Agrupa consumo, potência, corrente e tensão automaticamente na visão Elétrica.
+- Recupera quadro, circuito e fase quando há vínculo elétrico cadastrado ou uma medição associada ao circuito; mostra pendências quando faltam dados ou há conflitos.
+- Mantém dispositivos sem cômodo vinculado na lista A localizar.
+- Corrige o identificador nativo dos andares do HA.
+
 ## 0.5.0
 
 - Declara a base Home Assistant/Alpine compatível com o serviço já usado na instalação.
