@@ -194,3 +194,25 @@ ficam em `/data/electrical-catalog-bindings.json`, resistindo a renomeações.
 Esses vínculos não inventam disjuntores nem equivalências entre A/B/C e L1/L2/L3;
 cadastros explícitos de circuito têm prioridade. Uma identificação por comparação
 continua aparecendo como provável, sem se transformar em confirmação física.
+
+## Cadastro automático no dashboard Energia do HA (0.8.0)
+
+`energy_dashboard_sync` inclui novos dispositivos em **Energia → Eletricidade →
+Dispositivos individuais**, pela API `energy/save_prefs`, a cada 15 minutos.
+Independe da planta, do cômodo e da identificação do quadro/fase. Requer um único
+contador de energia por dispositivo físico, unidade Wh/kWh/MWh, classe `energy`,
+estado acumulativo válido e estatísticas com soma disponíveis no Recorder.
+Dispositivos recém-descobertos aguardam estatísticas compatíveis no próximo ciclo.
+
+Preserva todas as seleções existentes, nomes, hierarquias, fontes de rede/solar
+e água. Não inclui medidores de quadro, produção, economia ou contadores ambíguos;
+nem duplica um dispositivo que já tenha outra entidade selecionada, inclusive
+representações Tuya/LocalTuya com a mesma identidade física. Dispositivos somente
+com potência não recebem consumo estimado automaticamente.
+
+Antes de cada alteração, salva as preferências originais em
+`/data/energy-prefs-before-*.json`. O estado fica em `/data/energy-dashboard-sync.json`.
+Se o usuário remover um dispositivo incluído pela sincronização nas configurações
+de Energia, sua exclusão é respeitada. `energy_dashboard_sync: false` desativa novas
+inclusões. Não altera o histórico e não remove cadastros quando uma leitura fica
+indisponível. Alterações concorrentes detectadas adiam a gravação para o próximo ciclo.

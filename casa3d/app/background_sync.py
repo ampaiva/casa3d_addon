@@ -5,7 +5,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 
-from . import tuya_rooms, energy_learning, voltage_fix, meter_selection
+from . import tuya_rooms, energy_learning, voltage_fix, meter_selection, energy_dashboard
 from .ha_client import HAClient, supervisor_token
 
 _LOG = logging.getLogger(__name__)
@@ -106,6 +106,11 @@ def run_once(config_dir, data_dir, controls_path, options, client_factory=HAClie
                 state.update(last_attempt=time.time(), error='Falha na sincronizacao: ' + type(exc).__name__)
                 tuya_rooms.write_state(data_dir, state)
                 _LOG.warning('Sincronizacao Tuya indisponivel (%s)', type(exc).__name__)
+        if options.get('energy_dashboard_sync', True):
+            try:
+                energy_dashboard.sync(client, data_dir)
+            except Exception as exc:
+                _LOG.warning('Sincronizacao com Energia do HA indisponivel (%s)', type(exc).__name__)
         if options.get('energy_learning', True):
             try:
                 learn(client, config_dir, data_dir)

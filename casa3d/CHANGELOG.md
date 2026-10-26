@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+
+- Cadastra automaticamente novos contadores de consumo individual no dashboard Energia do HA a cada 15 minutos, independentemente da planta, quadro ou fase.
+- Preserva cadastros manuais e hierarquias, evita duplicatas de um mesmo dispositivo e aguarda estatísticas compatíveis quando necessário.
+- Salva backup antes de atualizar pela API oficial, respeita remoções manuais e adia alterações concorrentes.
+- Permite desativar novas inclusões com a opção energy_dashboard_sync.
+
 ## 0.7.3
 
 - Usa os seis canais cadastrados dos quadros na comparação automática, excluindo representações antigas e mantendo canais esperados sem leitura como pendência.
