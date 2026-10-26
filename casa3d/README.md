@@ -121,8 +121,8 @@ Quadro, circuito e fase são recuperados de vínculos elétricos existentes da C
 A origem do vínculo aparece na descrição. Relações conflitantes ou ausentes são
 mostradas como pendentes. Não se infere fase pela tensão ou cômodo, nem
 se atribui o circuito de um gateway a todos os dispositivos conectados a ele.
-As cargas/lâmpadas mantêm suas posições independentes. O painel Energia do HA
-não é alterado; a descoberta alimenta a visão de energia da Casa 3D.
+As cargas/lâmpadas mantêm suas posições independentes. A descoberta alimenta a visão de energia da Casa 3D. O cadastro no dashboard
+Energia do HA é feito separadamente pela sincronização automática descrita abaixo.
 
 ## Sincronização Tuya → Home Assistant (0.7.0)
 
