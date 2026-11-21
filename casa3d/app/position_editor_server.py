@@ -843,6 +843,34 @@ HTML = r"""<!doctype html>
       body.editing .stageWrap { padding-bottom: 30dvh; }
       #electrical { grid-template-columns: 1fr; }
     }
+
+    #locationsDialog { width:min(860px,96vw); border-radius:16px; overflow:hidden; background:#f6f8fa; }
+    #locationsDialog[open] { display:flex; flex-direction:column; }
+    #locationsDialog button, #locationsDialog select, #locationsDialog input { font-size:14px; min-height:40px; }
+    #locationsDialog input { border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:white; color:var(--text); }
+    #locationsDialog button:focus-visible, #locationsDialog input:focus-visible, #locationsDialog select:focus-visible { outline:3px solid #52b6d5; outline-offset:2px; }
+    .rooms-heading { display:flex; justify-content:space-between; gap:16px; padding:24px 24px 16px; background:white; }
+    .rooms-heading h2 { margin:0; font-size:24px; }.rooms-heading p { margin:6px 0 0; color:#53606c; font-size:14px; }
+    #locationsClose { border:0; align-self:flex-start; font-size:20px!important; }
+    .rooms-tools { padding:0 24px 16px; background:white; border-bottom:1px solid var(--line); }
+    #roomSearch { width:100%; font-size:16px!important; }#roomFilters { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+    #roomFilters button { border-radius:20px; font-weight:500; }#roomFilters [aria-pressed="true"] { background:#e5f4f8; border-color:#8cc9da; color:#145c71; }
+    #roomResults { font-size:13px; color:#53606c; margin:12px 0 0; }
+    .rooms-body { overflow:auto; padding:16px 24px; min-height:100px; }
+    #roomBindings { display:grid; gap:12px; }.room-card { background:white; border:1px solid var(--line); border-radius:12px; padding:16px; }
+    .room-card[hidden], #roomsEmpty[hidden] { display:none; }
+    .room-card-heading { display:flex; gap:12px; justify-content:space-between; align-items:flex-start; }.room-card h3 { margin:0; font-size:17px; }
+    .room-description { color:#53606c; font-size:14px; margin:5px 0 12px; }.room-badge { font-size:12px; white-space:nowrap; color:#855510; background:#fff4db; padding:4px 8px; border-radius:12px; }
+    .room-badge.linked { color:#21614d; background:#e8f5ee; }.room-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .room-actions label { display:flex; align-items:center; gap:8px; font-size:14px; }.room-actions select { max-width:210px; }
+    .room-fine { margin-top:12px; font-size:14px; color:#53606c; }.room-fine summary { cursor:pointer; }.room-numbers { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:12px; }.room-numbers label { display:grid; gap:5px; }.room-numbers input { width:100%; }
+    .room-remove { color:#a43c31!important; border:0; background:transparent; margin-left:auto; }
+    .room-devices { font-size:13px; color:#53606c; margin:12px 0 0; overflow-wrap:anywhere; }
+    .rooms-advanced { margin-top:16px; padding:16px; border:1px solid var(--line); border-radius:12px; background:white; font-size:14px; }.rooms-advanced summary { cursor:pointer; font-weight:600; }.rooms-advanced h3 { font-size:15px; }
+    #floorBindings, #tuyaRoomBindings { display:grid; gap:10px; }#floorBindings label, #tuyaRoomBindings label { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    #pendingSearch { margin-top:14px; width:100%; }#unlocatedList { max-height:220px; overflow:auto; }#unlocatedList p { padding:10px 0; border-bottom:1px solid var(--line); margin:0; font-size:14px; }
+    .rooms-footer { padding:16px 24px; background:white; border-top:1px solid var(--line); display:flex; align-items:center; gap:8px; }.rooms-footer #locationsStatus { flex:1; font-size:13px; color:#53606c; }.rooms-footer .primary { background:#176d85; border-color:#176d85; }
+    @media(max-width:600px) { #locationsDialog { width:100vw; max-width:100vw; max-height:100dvh; height:100dvh; margin:0; border:0; border-radius:0; }.rooms-heading { padding:20px 16px 12px; }.rooms-tools { padding:0 16px 12px; }.rooms-body { padding:12px 16px; flex:1; }.rooms-footer { padding:12px 16px; flex-wrap:wrap; }.rooms-footer #locationsStatus { flex-basis:100%; }.room-actions { align-items:stretch; }.room-actions label { width:100%; justify-content:space-between; }.room-numbers { grid-template-columns:repeat(2,minmax(0,1fr)); } }
   </style>
 </head>
 <body>
@@ -901,15 +929,12 @@ HTML = r"""<!doctype html>
     </aside>
   </main>
   <dialog id="locationsDialog" aria-labelledby="locationsTitle">
-    <h2 id="locationsTitle">Andares e comodos do Home Assistant</h2>
-    <p>Vincule os andares às plantas. Marque cada cômodo na imagem ou ajuste sua região em porcentagens.</p>
-    <div id="floorBindings"></div>
-    <details><summary>Sincronizacao de comodos Tuya → HA</summary><p id="tuyaSyncStatus"></p><div id="tuyaRoomBindings"></div><p>Vinculos iguais e novos dispositivos sao sincronizados a cada 15 minutos. Ajustes manuais no HA sao preservados. Comodos novos sem andar ou regiao precisam ser vinculados à planta.</p></details>
-    <div class="table-scroll"><table><thead><tr><th>Cômodo HA</th><th>Planta</th><th>Esquerda %</th><th>Topo %</th><th>Largura %</th><th>Altura %</th><th>Região</th></tr></thead><tbody id="roomBindings"></tbody></table></div>
-    <p>Novos dispositivos aparecem no centro do cômodo. Arraste para ajustar a posição exata.</p>
-    <h3>A localizar</h3><div id="unlocatedList"></div>
-    <p id="locationsStatus" role="status"></p>
-    <button id="locationsCancel">Cancelar</button><button id="locationsSave" class="primary">Salvar vinculos</button>
+    <div class="rooms-heading"><div><h2 id="locationsTitle">Cômodos</h2><p>Escolha um cômodo e marque onde ele fica na planta.</p></div><button id="locationsClose" aria-label="Fechar cômodos">✕</button></div>
+    <div class="rooms-tools"><input id="roomSearch" type="search" placeholder="Buscar cômodo ou dispositivo" aria-label="Buscar cômodo ou dispositivo"><div id="roomFilters" role="group" aria-label="Filtrar cômodos"><button data-filter="all" aria-pressed="true">Todos</button><button data-filter="pending" aria-pressed="false">Sem região</button><button data-filter="linked" aria-pressed="false">Na planta</button></div><p id="roomResults" role="status"></p></div>
+    <div class="rooms-body"><div id="roomBindings"></div><p id="roomsEmpty" hidden>Nenhum cômodo encontrado. Tente outro nome ou filtro.</p>
+    <details class="rooms-advanced"><summary>Andares e sincronização Tuya</summary><h3>Planta de cada andar</h3><div id="floorBindings"></div><h3>Sincronização Tuya</h3><p id="tuyaSyncStatus"></p><div id="tuyaRoomBindings"></div><p>As mudanças da Tuya são verificadas a cada 15 minutos. Ajustes manuais no Home Assistant são preservados.</p></details>
+    <details class="rooms-advanced"><summary id="unlocatedSummary">Dispositivos a localizar</summary><input id="pendingSearch" type="search" placeholder="Buscar dispositivo pendente" aria-label="Buscar dispositivo pendente"><div id="unlocatedList"></div></details></div>
+    <div class="rooms-footer"><span id="locationsStatus" role="status"> </span><button id="locationsCancel">Cancelar</button><button id="locationsSave" class="primary">Salvar alterações</button></div>
   </dialog>
   <dialog id="panelDialog" aria-labelledby="panelTitle">
     <div class="panel-heading"><h2 id="panelTitle"></h2><button id="panelEdit" class="icon-button" title="Editar circuitos" aria-label="Editar circuitos"><i data-lucide="square-pen"></i></button><button id="panelClose" class="icon-button" title="Fechar quadro" aria-label="Fechar quadro"><i data-lucide="x"></i></button></div>
@@ -1887,6 +1912,28 @@ HTML = r"""<!doctype html>
     const locationsDialog = document.getElementById('locationsDialog');
     let mappingDraft;
     let drawingRoom = null;
+    let roomFilter = 'all';
+    const roomSearchText = value => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
+    function markRoomChange() { document.getElementById('locationsStatus').textContent = 'Alterações não salvas'; }
+    function filterRooms() {
+      const query = roomSearchText(document.getElementById('roomSearch').value.trim());
+      const cards = [...document.querySelectorAll('#roomBindings .room-card')]; let visible = 0;
+      for (const card of cards) {
+        const matches = card.dataset.search.includes(query) && (roomFilter === 'all' || (card.dataset.linked === 'true') === (roomFilter === 'linked'));
+        card.hidden = !matches; if (matches) visible++;
+      }
+      document.getElementById('roomResults').textContent = `${visible} de ${cards.length} cômodos`;
+      document.getElementById('roomsEmpty').hidden = visible !== 0;
+      for (const button of document.querySelectorAll('#roomFilters button')) button.setAttribute('aria-pressed',String(button.dataset.filter === roomFilter));
+    }
+    document.getElementById('roomSearch').oninput = filterRooms;
+    for (const button of document.querySelectorAll('#roomFilters button')) button.onclick = () => { roomFilter = button.dataset.filter; filterRooms(); };
+    function filterPending() {
+      const query = roomSearchText(document.getElementById('pendingSearch').value.trim());
+      for (const row of document.querySelectorAll('#unlocatedList p')) row.hidden = !roomSearchText(row.textContent).includes(query);
+    }
+    document.getElementById('pendingSearch').oninput = filterPending;
+
     function plantSelect(value, inherited = false) {
       const select = document.createElement('select');
       for (const [id, label] of [['', inherited ? 'Usar andar do HA' : 'Sem vinculo'], ['terreo', 'Terreo'], ['superior', 'Superior']]) {
@@ -1924,12 +1971,14 @@ HTML = r"""<!doctype html>
     }
     document.getElementById('locationsButton').onclick = () => openLocations(false);
     function openLocations(keepDraft = false) {
-      if (!keepDraft) mappingDraft = structuredClone(data.location_mapping || {floors:{}, rooms:{}});
+      if (!keepDraft) { mappingDraft = structuredClone(data.location_mapping || {floors:{}, rooms:{}}); document.getElementById('roomSearch').value = ''; roomFilter = 'all'; }
+      mappingDraft.floors ||= {}; mappingDraft.rooms ||= {};
       const floorBindings = document.getElementById('floorBindings'); floorBindings.replaceChildren();
       for (const haFloor of locationRegistry.floors) {
         const label = document.createElement('label'); label.textContent = haFloor.name + ' ';
         const select = plantSelect(mappingDraft.floors[haFloor.id]);
-        select.onchange = () => mappingDraft.floors[haFloor.id] = select.value;
+        select.setAttribute('aria-label','Planta do andar ' + haFloor.name);
+        select.onchange = () => { mappingDraft.floors[haFloor.id] = select.value; openLocations(true); markRoomChange(); };
         label.append(select); floorBindings.append(label);
       }
       const synced = document.getElementById('tuyaRoomBindings'); synced.replaceChildren();
@@ -1939,50 +1988,73 @@ HTML = r"""<!doctype html>
         const label = document.createElement('label'); label.textContent = room.name + ' → ';
         const select = document.createElement('select'); select.setAttribute('aria-label', 'Area HA para ' + room.name);
         options(select, [['','Nao sincronizar'], ...locationRegistry.areas.map(a => [a.id,a.name])], mappingDraft.tuya_rooms[room.key] ?? room.area_id);
-        select.onchange = () => { mappingDraft.tuya_rooms[room.key] = select.value; };
-        label.append(select); synced.append(label, document.createElement('br'));
+        select.onchange = () => { mappingDraft.tuya_rooms[room.key] = select.value; markRoomChange(); };
+        label.append(select); synced.append(label);
       }
       const rows = document.getElementById('roomBindings'); rows.replaceChildren();
-      for (const area of locationRegistry.areas) {
-        const row = document.createElement('tr'); const name = document.createElement('td');
-        name.textContent = area.name; row.append(name);
-        const cell = document.createElement('td'); const enabled = document.createElement('input');
-        enabled.type = 'checkbox'; enabled.checked = Boolean(mappingDraft.rooms[area.id]);
-        enabled.setAttribute('aria-label', 'Vincular ' + area.name);
+      const points = Object.values(data.device_positions || {}).flatMap(value => Object.values(value));
+      const seen = new Set();
+      const uniquePoints = points.filter(point => { const id = point.ha_device_id || point.title; if (seen.has(id)) return false; seen.add(id); return true; });
+      for (const area of [...locationRegistry.areas].sort((a,b) => a.name.localeCompare(b.name,'pt-BR'))) {
+        const card = document.createElement('article'); card.className = 'room-card';
         const room = {...{floor:'', left:40, top:40, width:20, height:20}, ...mappingDraft.rooms[area.id]};
-        const select = plantSelect(room.floor, true); select.setAttribute('aria-label', 'Planta de ' + area.name);
-        const update = () => { if (enabled.checked) mappingDraft.rooms[area.id] = room; else delete mappingDraft.rooms[area.id]; };
-        enabled.onchange = update; select.onchange = () => { room.floor = select.value; update(); };
-        cell.append(enabled, select); row.append(cell);
-        for (const key of ['left','top','width','height']) {
-          const td = document.createElement('td'); const field = document.createElement('input');
-          field.type = 'number'; field.min = '0'; field.max = '100'; field.step = '0.01'; field.style.width = '5em';
-          field.value = room[key]; field.required = true; field.setAttribute('aria-label', area.name + ' ' + key);
-          field.oninput = () => { room[key] = Number(field.value); update(); }; td.append(field); row.append(td);
+        const devices = uniquePoints.filter(point => point.ha_area_id === area.id);
+        card.dataset.search = roomSearchText([area.name, ...devices.map(point => point.title)].join(' '));
+        const heading = document.createElement('div'); heading.className = 'room-card-heading';
+        const name = document.createElement('h3'); name.textContent = area.name;
+        const badge = document.createElement('span'); badge.className = 'room-badge'; heading.append(name,badge); card.append(heading);
+        const description = document.createElement('p'); description.className = 'room-description'; card.append(description);
+        const actions = document.createElement('div'); actions.className = 'room-actions';
+        const label = document.createElement('label'); label.textContent = 'Planta';
+        const select = plantSelect(room.floor || mappingDraft.floors[area.floor_id]); select.setAttribute('aria-label', 'Planta de ' + area.name);
+        label.append(select); actions.append(label);
+        const draw = document.createElement('button'); draw.type = 'button'; draw.setAttribute('aria-label','Marcar ' + area.name + ' na planta'); actions.append(draw);
+        const remove = document.createElement('button'); remove.className = 'room-remove'; remove.textContent = 'Desvincular'; remove.setAttribute('aria-label','Desvincular ' + area.name); actions.append(remove); card.append(actions);
+        const fine = document.createElement('details'); fine.className = 'room-fine';
+        const summary = document.createElement('summary'); summary.textContent = 'Ajuste fino da região'; fine.append(summary);
+        const numbers = document.createElement('div'); numbers.className = 'room-numbers';
+        for (const [key,title] of [['left','Esquerda (%)'],['top','Topo (%)'],['width','Largura (%)'],['height','Altura (%)']]) {
+          const fieldLabel = document.createElement('label'); fieldLabel.textContent = title;
+          const field = document.createElement('input'); field.type = 'number'; field.min = '0'; field.max = '100'; field.step = '0.01'; field.value = room[key]; field.setAttribute('aria-label',area.name+' '+title);
+          field.oninput = () => { room[key] = field.value === '' ? NaN : Number(field.value); mappingDraft.rooms[area.id] = room; refresh(); markRoomChange(); };
+          fieldLabel.append(field); numbers.append(fieldLabel);
         }
-        const drawCell = document.createElement('td'); const draw = document.createElement('button');
-        draw.textContent = 'Marcar na planta'; draw.type = 'button';
+        fine.append(numbers); card.append(fine);
+        if (devices.length) { const list = document.createElement('p'); list.className = 'room-devices'; list.textContent = devices.map(point => point.title).join(' · '); card.append(list); }
+        const refresh = () => {
+          const linked = Boolean(mappingDraft.rooms[area.id]); const target = room.floor || mappingDraft.floors[area.floor_id];
+          card.dataset.linked = linked ? 'true' : 'false'; badge.textContent = linked ? 'Na planta' : 'Sem região'; badge.classList.toggle('linked',linked);
+          description.textContent = `${devices.length} ${devices.length === 1 ? 'dispositivo' : 'dispositivos'} · ` + (linked ? (target === 'terreo' ? 'Térreo' : target === 'superior' ? 'Superior' : 'Escolha uma planta') : 'Marque a região para posicionar os dispositivos.');
+          draw.textContent = linked ? 'Ajustar na planta' : 'Marcar na planta'; remove.hidden = !linked; fine.hidden = !linked;
+        };
+        select.onchange = () => { room.floor = select.value; if (mappingDraft.rooms[area.id]) mappingDraft.rooms[area.id] = room; refresh(); markRoomChange(); };
+        remove.onclick = () => { delete mappingDraft.rooms[area.id]; refresh(); markRoomChange(); filterRooms(); };
         draw.onclick = () => {
-          const target = room.floor || mappingDraft.floors[area.floor_id];
-          if (!target) { document.getElementById('locationsStatus').textContent = 'Escolha a planta do andar ou do comodo primeiro.'; return; }
-          enabled.checked = true; update(); floorSelect.value = target;
-          drawingRoom = {room, start:null}; selected = null; dragging = null;
+          const target = select.value || mappingDraft.floors[area.floor_id];
+          if (!target) { document.getElementById('locationsStatus').textContent = 'Escolha a planta de ' + area.name + ' para continuar.'; select.focus(); return; }
+          const previousRoom = mappingDraft.rooms[area.id] ? structuredClone(mappingDraft.rooms[area.id]) : null;
+          room.floor = select.value; mappingDraft.rooms[area.id] = room; floorSelect.value = target;
+          drawingRoom = {room, areaId:area.id, previousRoom, start:null}; selected = null; dragging = null;
           floorSelect.disabled = true; document.getElementById('locationsButton').disabled = true;
           document.getElementById('edit').disabled = true; locationsDialog.close();
-          status.textContent = 'Marque dois cantos opostos do comodo na planta';
-          document.getElementById('connection').textContent = 'Marque dois cantos opostos do comodo. Esc cancela.';
+          status.textContent = 'Marque dois cantos opostos de ' + area.name;
+          document.getElementById('connection').textContent = 'Marque dois cantos opostos de ' + area.name + '. Esc cancela.';
           stage.style.cursor = 'crosshair'; render();
         };
-        drawCell.append(draw); row.append(drawCell); rows.append(row);
+        refresh(); rows.append(card);
       }
+      filterRooms();
       const pending = document.getElementById('unlocatedList'); pending.replaceChildren();
       for (const point of Object.values(data.device_positions?.unlocated || {})) {
         const line = document.createElement('p');
         line.textContent = [point.title, point.ha_area_name, point.location_reason].filter(Boolean).join(' · '); pending.append(line);
       }
+      document.getElementById('unlocatedSummary').textContent = `Dispositivos a localizar (${pending.children.length})`;
       if (!pending.children.length) pending.textContent = 'Nenhum dispositivo pendente.';
-      document.getElementById('locationsStatus').textContent = locationRegistry.areas.length ? '' : 'Nenhum comodo encontrado. Confira o acesso ao cadastro do Home Assistant.';
-      locationsDialog.showModal();
+      filterPending();
+      document.getElementById('locationsStatus').textContent = !locationRegistry.areas.length ? 'Nenhum cômodo encontrado. Confira o acesso ao cadastro do Home Assistant.' : keepDraft ? 'Alterações não salvas' : '';
+      if (!locationsDialog.open) locationsDialog.showModal();
+      if (!keepDraft) document.getElementById('roomSearch').focus();
     };
     stage.addEventListener('pointerdown', event => {
       if (!drawingRoom) return;
@@ -2001,15 +2073,19 @@ HTML = r"""<!doctype html>
     }, true);
     window.addEventListener('keydown', event => {
       if (event.key === 'Escape' && drawingRoom) {
+        if (drawingRoom.previousRoom) mappingDraft.rooms[drawingRoom.areaId] = drawingRoom.previousRoom; else delete mappingDraft.rooms[drawingRoom.areaId];
         drawingRoom = null; floorSelect.disabled = false; document.getElementById('locationsButton').disabled = false; document.getElementById('edit').disabled = false; stage.style.cursor = ''; document.getElementById('connection').textContent = ''; openLocations(true);
       }
     });
     document.getElementById('locationsCancel').onclick = () => locationsDialog.close();
+    document.getElementById('locationsClose').onclick = () => locationsDialog.close();
     document.getElementById('locationsSave').onclick = async () => {
       const previous = data.location_mapping;
       data.location_mapping = mappingDraft;
+      const button = document.getElementById('locationsSave'); button.disabled = true; button.textContent = 'Salvando…';
       try { await persistControls(); locationsDialog.close(); }
-      catch { data.location_mapping = previous; document.getElementById('locationsStatus').textContent = 'Nao foi possivel salvar. Confira se as regioes cabem na planta e tente novamente.'; }
+      catch { data.location_mapping = previous; document.getElementById('locationsStatus').textContent = 'Não foi possível salvar. Confira as regiões em Ajuste fino e tente novamente.'; }
+      finally { button.disabled = false; button.textContent = 'Salvar alterações'; }
     };
     boot();
   </script>

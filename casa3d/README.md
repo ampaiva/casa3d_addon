@@ -77,7 +77,17 @@ não precisa de bibliotecas CAD durante a execução.
 
 ## Cômodos e localização pelo Home Assistant
 
-Abra **Cômodos** na barra da Casa 3D. Associe cada andar do HA à planta
+Abra **Cômodos** na barra da Casa 3D. Busque pelo nome do cômodo ou de um
+dispositivo (com ou sem acentos). Use **Sem região** para encontrar os cômodos
+que ainda precisam de marcação, ou **Na planta** para ajustar os já vinculados.
+Cada cartão mostra sua planta, situação e dispositivos. Escolha a planta e use
+**Marcar na planta**; nos cômodos existentes, use **Ajustar na planta**.
+As coordenadas ficam recolhidas em **Ajuste fino da região**. Finalize em
+**Salvar alterações**. Cancelar ou fechar descarta o rascunho; Esc durante a
+marcação restaura a região anterior. Pesquisa e filtro são preservados ao voltar
+da planta. A lista **Dispositivos a localizar** também tem pesquisa.
+
+Em **Andares e sincronização Tuya**, associe cada andar do HA à planta
 Térreo ou Superior. Marque os cômodos que deseja vincular e informe sua região
 na imagem: use **Marcar na planta** e clique em dois cantos opostos do cômodo,
 ou informe esquerda, topo, largura e altura em porcentagens. Esc cancela a marcação. A planta do
