@@ -48,18 +48,24 @@ def compare(device, meters, missing_channels=None):
     """Demand repeated signed transitions and a unique winner across all meters."""
     events = []
     last = -float('inf')
-    for (previous_t, before), (timestamp, after) in zip(device, device[1:]):
-        if before is None or after is None:
+    for timestamp, value in device:
+        if value is None or timestamp - last < 180 or timestamp + 90 > device[-1][0]:
+            continue
+        # A compressor can report 0 -> 500 -> 100 W within a second. Compare
+        # settled levels around the whole transition, not the last two samples:
+        # otherwise the inrush's end becomes a fictitious 400 W switch-off.
+        before = at(device, timestamp - 15)
+        after = at(device, timestamp + 30)
+        stable = at(device, timestamp + 90)
+        if before is None or after is None or stable is None:
             continue
         delta = after - before
-        if abs(delta) < 100 or timestamp - last < 180:
+        if abs(delta) < 35:
             continue
-        # Never extrapolate a just-started load into a future observation window.
-        if timestamp + 90 > device[-1][0]:
+        # Explicit outages invalidate the transition even if readings recover.
+        if any(v is None for t, v in device if timestamp - 15 <= t <= timestamp + 90):
             continue
-        # Ignore transient spikes and windows without fresh readings.
-        stable = at(device, timestamp + 90, max_age=float('inf'))
-        if stable is None or abs(stable - after) > max(40, abs(delta) * .15):
+        if abs(stable - after) > max(15, abs(delta) * .15):
             continue
         events.append((timestamp, delta))
         last = timestamp
@@ -74,7 +80,7 @@ def compare(device, meters, missing_channels=None):
                 continue
             compared += 1
             observed = after - before
-            if observed * delta > 0 and abs(observed - delta) <= max(50, abs(delta) * .25):
+            if observed * delta > 0 and abs(observed - delta) <= max(15, abs(delta) * .25):
                 matches.append(delta)
         positive, negative = sum(x > 0 for x in matches), sum(x < 0 for x in matches)
         score = len(matches) / compared if compared else 0

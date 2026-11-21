@@ -1,4 +1,4 @@
-"""Append unambiguous appliance counters to HA Energy through its supported API."""
+"""Synchronize unambiguous appliance counters and names through HA's API."""
 import json
 import math
 import time
@@ -79,7 +79,31 @@ def plan(prefs, entities, devices, states, statistics, ignored=()):
             continue
         additions.append(row)
         managed[row['stat_consumption']] = physical
-    return {'additions': additions, 'managed': managed, 'pending': pending}
+    # Existing rows retain all their options (parent, rate sensor, etc.). Only
+    # rename a single appliance counter; a device with several selected channels
+    # needs its individual channel names preserved.
+    selected = {}
+    for row in prefs.get('device_consumption', []):
+        physical = key(row['stat_consumption'])
+        if physical:
+            selected.setdefault(physical, []).append(row)
+    renames = {}
+    for physical, rows in selected.items():
+        if len(rows) != 1 or physical in {key(e) for e in source_ids}:
+            continue
+        row = rows[0]
+        eid = row['stat_consumption']
+        entry = entities[eid]
+        device = devices[entry['device_id']]
+        attrs = states.get(eid, {}).get('attributes', {})
+        title = device.get('name_by_user') or device.get('name')
+        if (not title or not eid.startswith('sensor.') or entry.get('disabled_by')
+                or entry.get('hidden_by') or entry.get('entity_category')
+                or (entry.get('device_class') or entry.get('original_device_class') or attrs.get('device_class')) != 'energy'):
+            continue
+        if row.get('name') != title:
+            renames[eid] = title
+    return {'additions': additions, 'managed': managed, 'pending': pending, 'renames': renames}
 
 
 def write(path, value):
@@ -108,8 +132,8 @@ def sync(client, data_dir):
         if eid not in current:
             ignored.add(physical)  # Respect removal in HA's own Energy settings.
     result = plan(prefs, entities, devices, states, statistics, ignored)
-    added = []
-    if result['additions']:
+    added, renamed = [], []
+    if result['additions'] or result['renames']:
         # Only the device list is saved. Abort on concurrent edits instead of replacing them.
         latest = client.call('energy/get_prefs')
         if latest != prefs:
@@ -118,12 +142,17 @@ def sync(client, data_dir):
             return state
         backup = data_dir / ('energy-prefs-before-' + str(time.time_ns()) + '.json')
         write(backup, prefs)
-        requested = prefs.get('device_consumption', []) + result['additions']
+        requested = [{**row, **({'name': result['renames'][row['stat_consumption']]}
+                                if row['stat_consumption'] in result['renames'] else {})}
+                     for row in prefs.get('device_consumption', [])] + result['additions']
         saved = client.call('energy/save_prefs', device_consumption=requested)
         confirmed = {r['stat_consumption'] for r in saved.get('device_consumption', [])}
         added = [r for r in result['additions'] if r['stat_consumption'] in confirmed]
+        renamed = [r for r in saved.get('device_consumption', [])
+                   if r['stat_consumption'] in result['renames']
+                   and r.get('name') == result['renames'][r['stat_consumption']]]
         managed.update({r['stat_consumption']: result['managed'][r['stat_consumption']] for r in added})
     state.update(updated_at=time.time(), managed=managed, ignored_devices=sorted(ignored),
-                 added=added, pending=result['pending'], status='Sincronizacao com Energia do HA concluida')
+                 added=added, renamed=renamed, pending=result['pending'], status='Sincronizacao com Energia do HA concluida')
     write(path, state)
     return state

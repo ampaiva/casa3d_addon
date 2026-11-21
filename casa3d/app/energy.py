@@ -46,6 +46,13 @@ def discover(controls, registry, normalize, learning=None, catalog=None):
         catalog_rows = [row for row in (catalog or {}).get('rows', []) if row.get('device_id') == device_id]
         catalog_values = {(row['panel_label'], tuple(row['channels'])) for row in catalog_rows}
         catalog_assignment = catalog_rows[0] if len(catalog_values) == 1 else None
+        evidence = (learning or {}).get('devices', {}).get(device_id, {'status': (learning or {}).get('status') or 'Comparacao de consumo aguardando dados'})
+        detected_supply = None
+        if not assignment and not candidates and not catalog_values and evidence.get('candidate') and evidence.get('meter'):
+            meter = evidence['meter']
+            detected_supply = {'panel_label': meter.get('panel_label') or meter['title'],
+                               'phase': meter['channel'], 'source': 'Comparacao automatica de potencia',
+                               'confidence': evidence['candidate']['score'], 'meter_entity': meter['entity']}
         if assignment:
             assignment_status = 'Identificado'
         elif candidates:
@@ -54,12 +61,14 @@ def discover(controls, registry, normalize, learning=None, catalog=None):
             assignment_status = 'Vinculos conflitantes no catalogo'
         elif catalog_assignment:
             assignment_status = 'Quadro %s · Fases %s · Circuito a identificar' % (catalog_assignment['panel_label'], ' + '.join(catalog_assignment['channels']))
+        elif detected_supply:
+            assignment_status = '%s · Fase %s · Deteccao automatica provavel · Circuito a identificar' % (detected_supply['panel_label'], detected_supply['phase'])
         else:
             assignment_status = 'Quadro, circuito e fase a identificar'
         result.append({'device_id': device_id, 'key': key, 'title': point.get('title', key),
                        'area': areas.get(device.get('area_id'), {}).get('name') or point.get('ha_area_name', ''), 'floor': floor, 'readings': readings,
                        'assignment': assignment, 'catalog_assignment': catalog_assignment,
                        'assignment_conflict': bool(candidates and not assignment) or len(catalog_values) > 1,
-                       'learning': (learning or {}).get('devices', {}).get(device_id, {'status': (learning or {}).get('status') or 'Comparacao de consumo aguardando dados'}),
+                       'learning': evidence, 'detected_supply': detected_supply,
                        'assignment_status': assignment_status})
     return result

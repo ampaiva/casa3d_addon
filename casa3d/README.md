@@ -167,13 +167,20 @@ original sem transformar dados históricos.
 ### Identificação passiva da alimentação
 
 `energy_learning` compara até 24 horas de potência das cargas com os canais A/B/C
-dos medidores. Normaliza W/kW, ignora valores inválidos e exige pelo menos seis
+dos medidores. Compara o nível 15 segundos antes da transição com o nível
+estabilizado após 30 segundos e confirma a estabilidade após 90 segundos.
+Assim, uma partida 0 → 500 → 100 W é analisada como uma subida de 100 W,
+sem tratar o fim do pico como desligamento. Considera variações a partir de
+35 W, com tolerância de 25% (mínimo de 15 W), e intervalo de três minutos
+entre eventos. Normaliza W/kW, ignora valores inválidos e exige pelo menos seis
 variações coincidentes, incluindo duas subidas e duas descidas, concordância de
 80% e vantagem mínima de 25 pontos percentuais sobre o segundo candidato.
 Sinais iguais em dois medidores são considerados ambíguos. Não aciona aparelhos.
 
-O resultado aparece na visão Elétrica como **alimentação provável**, com medidor,
-canal e evidência. Não vira um circuito cadastrado: um medidor de quadro não
+O resultado aparece automaticamente na identificação do dispositivo na visão
+Elétrica, com **quadro e fase prováveis**, medidor, canal e evidência. É
+reavaliado a cada ciclo e não sobrescreve vínculos explícitos nem o catálogo.
+Não vira um circuito cadastrado: um medidor de quadro não
 identifica o disjuntor individual. Canal A/B/C também não é tratado como L1/L2/L3
 sem confirmação da ligação física. Vínculos elétricos explícitos continuam tendo
 prioridade. Falhas ou resultados antigos deixam de apresentar candidatos atuais.
@@ -204,8 +211,11 @@ contador de energia por dispositivo físico, unidade Wh/kWh/MWh, classe `energy`
 estado acumulativo válido e estatísticas com soma disponíveis no Recorder.
 Dispositivos recém-descobertos aguardam estatísticas compatíveis no próximo ciclo.
 
-Preserva todas as seleções existentes, nomes, hierarquias, fontes de rede/solar
-e água. Não inclui medidores de quadro, produção, economia ou contadores ambíguos;
+Preserva todas as seleções existentes, hierarquias, fontes de rede/solar
+e água. Atualiza o nome de cada dispositivo individual já cadastrado para o
+nome atual no HA (`name_by_user` tem prioridade), inclusive nas inclusões
+anteriores à versão 0.8.1. Para dispositivos com vários contadores selecionados,
+preserva os nomes individuais dos canais. Não inclui medidores de quadro, produção, economia ou contadores ambíguos;
 nem duplica um dispositivo que já tenha outra entidade selecionada, inclusive
 representações Tuya/LocalTuya com a mesma identidade física. Dispositivos somente
 com potência não recebem consumo estimado automaticamente.
@@ -214,5 +224,5 @@ Antes de cada alteração, salva as preferências originais em
 `/data/energy-prefs-before-*.json`. O estado fica em `/data/energy-dashboard-sync.json`.
 Se o usuário remover um dispositivo incluído pela sincronização nas configurações
 de Energia, sua exclusão é respeitada. `energy_dashboard_sync: false` desativa novas
-inclusões. Não altera o histórico e não remove cadastros quando uma leitura fica
+inclusões e atualizações de nomes. Não altera o histórico e não remove cadastros quando uma leitura fica
 indisponível. Alterações concorrentes detectadas adiam a gravação para o próximo ciclo.
