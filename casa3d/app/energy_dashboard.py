@@ -26,7 +26,7 @@ def identity(device):
     return json.dumps(physical_key(device), separators=(',', ':'))
 
 
-def plan(prefs, entities, devices, states, statistics, ignored=()):
+def plan(prefs, entities, devices, states, statistics, ignored=(), managed_ids=()):
     """Keep existing selections; refuse duplicate devices and ambiguous counters."""
     devices = {d['id']: d for d in devices if not d.get('disabled_by')}
     entities = {e['entity_id']: e for e in entities}
@@ -93,6 +93,11 @@ def plan(prefs, entities, devices, states, statistics, ignored=()):
             continue
         row = rows[0]
         eid = row['stat_consumption']
+        # A name manually supplied in Energy can intentionally be more specific
+        # than the integration's generic device name. Follow registry renames
+        # for our own registrations and unnamed rows only.
+        if row.get('name') and eid not in managed_ids:
+            continue
         entry = entities[eid]
         device = devices[entry['device_id']]
         attrs = states.get(eid, {}).get('attributes', {})
@@ -103,6 +108,7 @@ def plan(prefs, entities, devices, states, statistics, ignored=()):
             continue
         if row.get('name') != title:
             renames[eid] = title
+            managed[eid] = physical
     return {'additions': additions, 'managed': managed, 'pending': pending, 'renames': renames}
 
 
@@ -131,7 +137,7 @@ def sync(client, data_dir):
     for eid, physical in managed.items():
         if eid not in current:
             ignored.add(physical)  # Respect removal in HA's own Energy settings.
-    result = plan(prefs, entities, devices, states, statistics, ignored)
+    result = plan(prefs, entities, devices, states, statistics, ignored, managed)
     added, renamed = [], []
     if result['additions'] or result['renames']:
         # Only the device list is saved. Abort on concurrent edits instead of replacing them.
@@ -151,7 +157,7 @@ def sync(client, data_dir):
         renamed = [r for r in saved.get('device_consumption', [])
                    if r['stat_consumption'] in result['renames']
                    and r.get('name') == result['renames'][r['stat_consumption']]]
-        managed.update({r['stat_consumption']: result['managed'][r['stat_consumption']] for r in added})
+        managed.update({r['stat_consumption']: result['managed'][r['stat_consumption']] for r in added + renamed})
     state.update(updated_at=time.time(), managed=managed, ignored_devices=sorted(ignored),
                  added=added, renamed=renamed, pending=result['pending'], status='Sincronizacao com Energia do HA concluida')
     write(path, state)

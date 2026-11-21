@@ -212,9 +212,10 @@ estado acumulativo válido e estatísticas com soma disponíveis no Recorder.
 Dispositivos recém-descobertos aguardam estatísticas compatíveis no próximo ciclo.
 
 Preserva todas as seleções existentes, hierarquias, fontes de rede/solar
-e água. Atualiza o nome de cada dispositivo individual já cadastrado para o
+e água. Atualiza o nome de cada dispositivo individual gerenciado pela sincronização para o
 nome atual no HA (`name_by_user` tem prioridade), inclusive nas inclusões
-anteriores à versão 0.8.1. Para dispositivos com vários contadores selecionados,
+anteriores à versão 0.8.1, e preenche cadastros sem nome. Nomes personalizados
+de cadastros manuais no Energia são preservados. Para dispositivos com vários contadores selecionados,
 preserva os nomes individuais dos canais. Não inclui medidores de quadro, produção, economia ou contadores ambíguos;
 nem duplica um dispositivo que já tenha outra entidade selecionada, inclusive
 representações Tuya/LocalTuya com a mesma identidade física. Dispositivos somente

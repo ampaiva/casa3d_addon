@@ -50,6 +50,8 @@ class Names(unittest.TestCase):
                  'device_consumption_water': [{'stat_consumption': 'sensor.water'}]}
         client = Client(prefs, entities, devices, states, stats)
         with tempfile.TemporaryDirectory() as directory:
+            Path(directory, 'energy-dashboard-sync.json').write_text(json.dumps({
+                'managed': {eid: energy_dashboard.identity(devices[0])}}))
             result = energy_dashboard.sync(client, directory)
             expected = copy.deepcopy(prefs)
             expected['device_consumption'][0]['name'] = 'Freezer'
@@ -69,6 +71,8 @@ class Names(unittest.TestCase):
                         entities, devices, states, stats)
         client.concurrent = True
         with tempfile.TemporaryDirectory() as directory:
+            Path(directory, 'energy-dashboard-sync.json').write_text(json.dumps({
+                'managed': {eid: energy_dashboard.identity(devices[0])}}))
             result = energy_dashboard.sync(client, directory)
         self.assertEqual(client.saves, 0)
         self.assertIn('Configuracao mudou', result['status'])
@@ -78,10 +82,24 @@ class Names(unittest.TestCase):
         entities.append({**entities[0], 'entity_id': 'sensor.other_channel'})
         prefs = {'device_consumption': [{'stat_consumption': eid, 'name': 'Canal 1'},
                                         {'stat_consumption': 'sensor.other_channel', 'name': 'Canal 2'}]}
-        self.assertEqual(energy_dashboard.plan(prefs, entities, devices, states, stats)['renames'], {})
+        self.assertEqual(energy_dashboard.plan(prefs, entities, devices, states, stats, managed_ids=[eid])['renames'], {})
         prefs = {'energy_sources': [{'stat_energy_from': 'sensor.other_channel'}],
                  'device_consumption': [{'stat_consumption': eid, 'name': 'Existing'}]}
+        self.assertEqual(energy_dashboard.plan(prefs, entities, devices, states, stats, managed_ids=[eid])['renames'], {})
+
+    def test_manual_custom_name_is_preserved_but_unnamed_row_follows_device(self):
+        eid, entities, devices, states, stats = appliance()
+        devices[0]['name'] = '16A Socket'
+        prefs = {'device_consumption': [{'stat_consumption': eid, 'name': 'Freezer da Cozinha'}]}
         self.assertEqual(energy_dashboard.plan(prefs, entities, devices, states, stats)['renames'], {})
+        del prefs['device_consumption'][0]['name']
+        self.assertEqual(energy_dashboard.plan(prefs, entities, devices, states, stats)['renames'], {eid: '16A Socket'})
+        client = Client(prefs, entities, devices, states, stats)
+        with tempfile.TemporaryDirectory() as directory:
+            energy_dashboard.sync(client, directory)
+            devices[0]['name'] = 'Nome atualizado'
+            energy_dashboard.sync(client, directory)
+            self.assertEqual(client.prefs['device_consumption'][0]['name'], 'Nome atualizado')
 
     def test_removed_managed_device_stays_removed(self):
         eid, entities, devices, states, stats = appliance()
