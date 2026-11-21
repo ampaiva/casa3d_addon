@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0
+
+- Redesenha Cômodos como lista pesquisável por cômodo ou dispositivo, com pesquisa sem distinção de acentos e filtros Todos, Sem região e Na planta.
+- Destaca a marcação visual na planta e recolhe coordenadas em Ajuste fino. Mostra dispositivos e situação de cada cômodo, com ações para ajustar ou desvincular.
+- Recolhe configuração de andares, sincronização Tuya e dispositivos pendentes em seções separadas; inclui pesquisa nos pendentes.
+- Mantém pesquisa e filtro ao voltar da planta, restaura a região anterior ao cancelar uma marcação com Esc e oferece ações fixas e layout adaptado ao celular.
+
 ## 0.8.2
 
 - Preserva nomes personalizados de contadores cadastrados manualmente no Energia. A atualização de nomes acompanha os contadores gerenciados pela sincronização e preenche cadastros sem nome.
