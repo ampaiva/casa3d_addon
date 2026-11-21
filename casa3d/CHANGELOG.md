@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1
+
+- Atualiza automaticamente o nome dos contadores individuais já cadastrados no Energia quando o dispositivo é renomeado no HA, preservando sensores, hierarquias e demais opções. Nomes de canais de dispositivos com múltiplos contadores selecionados são preservados.
+- Compara níveis estabilizados antes/depois da partida de compressores, sem confundir o fim do pico de partida com um desligamento. Inclui variações a partir de 35 W com tolerância proporcional, mantendo os limites de concordância, cobertura e ambiguidade.
+- Mostra quadro e fase detectados automaticamente no cartão do dispositivo, como associação provável, sem sobrescrever vínculos explícitos nem inventar o disjuntor individual.
+
 ## 0.8.0
 
 - Cadastra automaticamente novos contadores de consumo individual no dashboard Energia do HA a cada 15 minutos, independentemente da planta, quadro ou fase.
