@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.2
+
+- Preserva nomes personalizados de contadores cadastrados manualmente no Energia. A atualização de nomes acompanha os contadores gerenciados pela sincronização e preenche cadastros sem nome.
+
 ## 0.8.1
 
 - Atualiza automaticamente o nome dos contadores individuais já cadastrados no Energia quando o dispositivo é renomeado no HA, preservando sensores, hierarquias e demais opções. Nomes de canais de dispositivos com múltiplos contadores selecionados são preservados.
